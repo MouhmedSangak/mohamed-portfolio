@@ -14,16 +14,20 @@ interface BlogPageProps {
   params: { locale: string };
 }
 
-async function getBlogPosts() {
+async function getBlogPosts(): Promise<BlogPost[]> {
   const supabase = createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('blog_posts')
     .select('*')
     .eq('is_visible', true)
     .eq('status', 'published')
     .order('published_at', { ascending: false });
   
-  return data || [];
+  if (error || !data) {
+    return [];
+  }
+  
+  return data as BlogPost[];
 }
 
 export async function generateMetadata({ params }: BlogPageProps): Promise<Metadata> {
@@ -56,7 +60,7 @@ export default async function BlogPage({ params }: BlogPageProps) {
         {/* Posts Grid */}
         {posts.length > 0 ? (
           <StaggerContainer className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map((post) => (
+            {posts.map((post: BlogPost) => (
               <StaggerItem key={post.id}>
                 <BlogCard post={post} />
               </StaggerItem>
