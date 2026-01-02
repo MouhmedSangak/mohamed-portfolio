@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/Badge';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { Select } from '@/components/ui/Dropdown';
 import { cn } from '@/lib/utils/cn';
+import type { AnalyticsEvent } from '@/types/database';
 
 interface AnalyticsData {
   date: string;
@@ -49,13 +50,20 @@ interface BrowserStats {
   count: number;
 }
 
+interface Stats {
+  totalVisitors: number;
+  totalPageviews: number;
+  avgSessionDuration: number;
+  bounceRate: number;
+}
+
 export default function AnalyticsPage() {
   const supabase = getSupabaseClient();
   const toast = useToastActions();
 
   const [period, setPeriod] = useState('7');
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<Stats>({
     totalVisitors: 0,
     totalPageviews: 0,
     avgSessionDuration: 0,
@@ -74,7 +82,7 @@ export default function AnalyticsPage() {
       startDate.setDate(startDate.getDate() - days);
 
       // Fetch all events in period
-      const { data: events, error } = await supabase
+      const { data, error } = await supabase
         .from('analytics_events')
         .select('*')
         .gte('created_at', startDate.toISOString())
@@ -82,7 +90,10 @@ export default function AnalyticsPage() {
 
       if (error) throw error;
 
-      if (!events || events.length === 0) {
+      // Type assertion للبيانات
+      const events: AnalyticsEvent[] = (data || []) as AnalyticsEvent[];
+
+      if (events.length === 0) {
         setDailyData([]);
         setStats({ totalVisitors: 0, totalPageviews: 0, avgSessionDuration: 0, bounceRate: 0 });
         setDeviceStats({ mobile: 0, tablet: 0, desktop: 0 });
@@ -99,7 +110,7 @@ export default function AnalyticsPage() {
       const pages: Record<string, number> = {};
       const browsers: Record<string, number> = {};
 
-      events.forEach((event) => {
+      events.forEach((event: AnalyticsEvent) => {
         const date = event.created_at.split('T')[0];
         
         if (!dailyMap[date]) {
@@ -148,8 +159,8 @@ export default function AnalyticsPage() {
       setStats({
         totalVisitors: uniqueVisitors.size,
         totalPageviews: events.length,
-        avgSessionDuration: 0, // Would need session tracking
-        bounceRate: 0, // Would need session tracking
+        avgSessionDuration: 0,
+        bounceRate: 0,
       });
       setDeviceStats(devices);
       setTopPages(topPagesArray);
