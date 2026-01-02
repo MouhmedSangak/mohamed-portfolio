@@ -6,7 +6,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Clock, Tag, User } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Tag } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getTranslations } from 'next-intl/server';
@@ -23,9 +23,9 @@ interface BlogPostPageProps {
   params: { locale: string; slug: string };
 }
 
-async function getPost(slug: string) {
+async function getPost(slug: string): Promise<BlogPost | null> {
   const supabase = createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('blog_posts')
     .select('*')
     .eq('slug', slug)
@@ -33,12 +33,16 @@ async function getPost(slug: string) {
     .eq('is_visible', true)
     .single();
   
-  return data;
+  if (error || !data) {
+    return null;
+  }
+  
+  return data as BlogPost;
 }
 
-async function getRelatedPosts(currentId: string, tags: string[]) {
+async function getRelatedPosts(currentId: string): Promise<BlogPost[]> {
   const supabase = createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('blog_posts')
     .select('*')
     .eq('status', 'published')
@@ -46,19 +50,31 @@ async function getRelatedPosts(currentId: string, tags: string[]) {
     .neq('id', currentId)
     .limit(3);
   
-  return data || [];
+  if (error || !data) {
+    return [];
+  }
+  
+  return data as BlogPost[];
 }
 
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const post = await getPost(params.slug);
   
   if (!post) {
-    return { title: 'Post Not Found' };
+    return { 
+      title: 'Post Not Found',
+      description: 'The requested blog post could not be found.'
+    };
   }
 
   const locale = params.locale as Locale;
-  const title = post[`title_${locale}`] || post.title_en;
-  const description = post[`excerpt_${locale}`] || post.excerpt_en;
+  
+  // استخدام Type assertion لتجنب خطأ TypeScript
+  const titleKey = `title_${locale}` as keyof BlogPost;
+  const excerptKey = `excerpt_${locale}` as keyof BlogPost;
+  
+  const title = (post[titleKey] as string) || post.title_en;
+  const description = (post[excerptKey] as string) || post.excerpt_en || '';
 
   return {
     title,
@@ -73,20 +89,26 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const post = await getPost(params.slug);
-  const t = await getTranslations({ locale: params.locale, namespace: 'blog' });
-  const locale = params.locale as Locale;
-  const isRTL = locale === 'ar';
-
+  
   if (!post) {
     notFound();
   }
 
-  const title = post[`title_${locale}`] || post.title_en;
-  const excerpt = post[`excerpt_${locale}`] || post.excerpt_en;
-  const content = post[`content_${locale}`] || post.content_en;
+  const t = await getTranslations({ locale: params.locale, namespace: 'blog' });
+  const locale = params.locale as Locale;
+  const isRTL = locale === 'ar';
+
+  // استخدام Type assertion
+  const titleKey = `title_${locale}` as keyof BlogPost;
+  const excerptKey = `excerpt_${locale}` as keyof BlogPost;
+  const contentKey = `content_${locale}` as keyof BlogPost;
+
+  const title = (post[titleKey] as string) || post.title_en;
+  const excerpt = (post[excerptKey] as string) || post.excerpt_en;
+  const content = (post[contentKey] as string) || post.content_en;
   const tags = (post.tags as string[]) || [];
 
-  const relatedPosts = await getRelatedPosts(post.id, tags);
+  const relatedPosts = await getRelatedPosts(post.id);
 
   return (
     <article className="pt-24 pb-16">

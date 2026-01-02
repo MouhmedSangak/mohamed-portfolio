@@ -16,14 +16,15 @@ import { Button } from '@/components/ui/Button';
 import { AnimatedSection } from '@/components/layout/PageTransition';
 import { formatMonthYear } from '@/lib/utils/formatDate';
 import type { Locale } from '@/i18n/config';
+import type { Project } from '@/types/database';
 
 interface ProjectPageProps {
   params: { locale: string; slug: string };
 }
 
-async function getProject(slug: string) {
+async function getProject(slug: string): Promise<Project | null> {
   const supabase = createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('projects')
     .select('*')
     .eq('slug', slug)
@@ -31,19 +32,31 @@ async function getProject(slug: string) {
     .eq('is_visible', true)
     .single();
   
-  return data;
+  if (error || !data) {
+    return null;
+  }
+  
+  return data as Project;
 }
 
 export async function generateMetadata({ params }: ProjectPageProps): Promise<Metadata> {
   const project = await getProject(params.slug);
   
   if (!project) {
-    return { title: 'Project Not Found' };
+    return { 
+      title: 'Project Not Found',
+      description: 'The requested project could not be found.'
+    };
   }
 
   const locale = params.locale as Locale;
-  const title = project[`title_${locale}`] || project.title_en;
-  const description = project[`description_${locale}`] || project.description_en;
+  
+  // استخدام Type assertion لتجنب خطأ TypeScript
+  const titleKey = `title_${locale}` as keyof Project;
+  const descriptionKey = `description_${locale}` as keyof Project;
+  
+  const title = (project[titleKey] as string) || project.title_en;
+  const description = (project[descriptionKey] as string) || project.description_en || '';
 
   return {
     title,
@@ -56,19 +69,27 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const project = await getProject(params.slug);
-  const t = await getTranslations({ locale: params.locale, namespace: 'projects' });
-  const locale = params.locale as Locale;
-  const isRTL = locale === 'ar';
-
+  
   if (!project) {
     notFound();
   }
 
-  const title = project[`title_${locale}`] || project.title_en;
-  const description = project[`description_${locale}`] || project.description_en;
-  const content = project[`content_${locale}`] || project.content_en;
-  const role = project[`role_${locale}`] || project.role_en;
-  const highlights = (project[`highlights_${locale}`] as string[]) || (project.highlights_en as string[]) || [];
+  const t = await getTranslations({ locale: params.locale, namespace: 'projects' });
+  const locale = params.locale as Locale;
+  const isRTL = locale === 'ar';
+
+  // استخدام Type assertion
+  const titleKey = `title_${locale}` as keyof Project;
+  const descriptionKey = `description_${locale}` as keyof Project;
+  const contentKey = `content_${locale}` as keyof Project;
+  const roleKey = `role_${locale}` as keyof Project;
+  const highlightsKey = `highlights_${locale}` as keyof Project;
+
+  const title = (project[titleKey] as string) || project.title_en;
+  const description = (project[descriptionKey] as string) || project.description_en;
+  const content = (project[contentKey] as string) || project.content_en;
+  const role = (project[roleKey] as string) || project.role_en;
+  const highlights = (project[highlightsKey] as string[]) || (project.highlights_en as string[]) || [];
   const technologies = (project.technologies as string[]) || [];
 
   return (
