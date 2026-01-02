@@ -6,7 +6,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import {
   Plus,
   BookOpen,
@@ -15,7 +14,6 @@ import {
   Edit,
   Trash2,
   Star,
-  Calendar,
   ExternalLink,
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase/client';
@@ -48,7 +46,7 @@ export default function BlogPage() {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setPosts(data || []);
+        setPosts((data || []) as BlogPost[]);
       } catch (error) {
         console.error('Fetch error:', error);
         toast.error('Failed to load blog posts');
@@ -89,7 +87,7 @@ export default function BlogPage() {
     try {
       const { error } = await supabase
         .from('blog_posts')
-        .update({ is_visible: !post.is_visible })
+        .update({ is_visible: !post.is_visible } as any)
         .eq('id', post.id);
 
       if (error) throw error;
@@ -111,7 +109,7 @@ export default function BlogPage() {
     try {
       const { error } = await supabase
         .from('blog_posts')
-        .update({ is_featured: !post.is_featured })
+        .update({ is_featured: !post.is_featured } as any)
         .eq('id', post.id);
 
       if (error) throw error;
@@ -133,7 +131,7 @@ export default function BlogPage() {
       key: 'title_en',
       label: 'Post',
       sortable: true,
-      render: (post) => (
+      render: (post: BlogPost) => (
         <div className="flex items-center gap-3">
           {post.cover_image_url ? (
             <img
@@ -162,14 +160,14 @@ export default function BlogPage() {
       key: 'status',
       label: 'Status',
       sortable: true,
-      render: (post) => {
+      render: (post: BlogPost) => {
         const variants: Record<string, 'success' | 'warning' | 'secondary'> = {
           published: 'success',
           draft: 'warning',
           archived: 'secondary',
         };
         return (
-          <Badge variant={variants[post.status]}>
+          <Badge variant={variants[post.status] || 'secondary'}>
             {post.status}
           </Badge>
         );
@@ -178,7 +176,7 @@ export default function BlogPage() {
     {
       key: 'is_visible',
       label: 'Visible',
-      render: (post) => (
+      render: (post: BlogPost) => (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -197,7 +195,7 @@ export default function BlogPage() {
     {
       key: 'tags',
       label: 'Tags',
-      render: (post) => {
+      render: (post: BlogPost) => {
         const tags = (post.tags as string[]) || [];
         return (
           <div className="flex flex-wrap gap-1">
@@ -219,7 +217,7 @@ export default function BlogPage() {
       key: 'published_at',
       label: 'Published',
       sortable: true,
-      render: (post) => (
+      render: (post: BlogPost) => (
         <span className="text-dark-400 text-sm">
           {post.published_at
             ? formatShortDate(post.published_at, 'en')
@@ -230,7 +228,7 @@ export default function BlogPage() {
     {
       key: 'reading_time_minutes',
       label: 'Read Time',
-      render: (post) => (
+      render: (post: BlogPost) => (
         <span className="text-dark-400">{post.reading_time_minutes} min</span>
       ),
     },
@@ -240,23 +238,23 @@ export default function BlogPage() {
     {
       label: 'Edit',
       icon: <Edit className="h-4 w-4" />,
-      onClick: (post) => router.push(`/admin/blog/${post.id}`),
+      onClick: (post: BlogPost) => router.push(`/admin/blog/${post.id}`),
     },
     {
       label: 'View on Site',
       icon: <ExternalLink className="h-4 w-4" />,
-      onClick: (post) => window.open(`/en/blog/${post.slug}`, '_blank'),
-      show: (post) => post.status === 'published',
+      onClick: (post: BlogPost) => window.open(`/en/blog/${post.slug}`, '_blank'),
+      show: (post: BlogPost) => post.status === 'published',
     },
     {
-      label: (post) => post.is_featured ? 'Remove Featured' : 'Make Featured',
+      label: 'Toggle Featured',
       icon: <Star className="h-4 w-4" />,
-      onClick: toggleFeatured,
+      onClick: (post: BlogPost) => toggleFeatured(post),
     },
     {
       label: 'Delete',
       icon: <Trash2 className="h-4 w-4" />,
-      onClick: (post) => setDeleteId(post.id),
+      onClick: (post: BlogPost) => setDeleteId(post.id),
       danger: true,
     },
   ];
