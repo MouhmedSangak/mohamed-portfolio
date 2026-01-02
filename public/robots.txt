@@ -1,0 +1,9 @@
+# Robots.txt for Mohamed Sangak Portfolio
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+
+# Sitemap
+Sitemap: https://your-domain.com/sitemap.xml

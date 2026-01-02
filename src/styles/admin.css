@@ -1,0 +1,173 @@
+/* ============================================
+   Admin Panel Styles
+   ============================================ */
+
+/* Admin Layout */
+.admin-layout {
+  @apply min-h-screen bg-dark-950;
+}
+
+.admin-sidebar {
+  @apply fixed inset-y-0 left-0 z-50 w-64 bg-dark-900 border-r border-dark-700 transform transition-transform duration-300 ease-in-out lg:translate-x-0;
+}
+
+.admin-sidebar.rtl {
+  @apply left-auto right-0 border-l border-r-0;
+}
+
+.admin-main {
+  @apply lg:ml-64 min-h-screen;
+}
+
+.admin-main.rtl {
+  @apply lg:ml-0 lg:mr-64;
+}
+
+/* Admin Header */
+.admin-header {
+  @apply sticky top-0 z-40 h-16 bg-dark-900/80 backdrop-blur-lg border-b border-dark-700 flex items-center justify-between px-6;
+}
+
+/* Admin Cards */
+.admin-card {
+  @apply bg-dark-800 rounded-xl border border-dark-700 p-6 transition-all duration-200 hover:border-primary-500/50;
+}
+
+.admin-stat-card {
+  @apply admin-card flex items-center gap-4;
+}
+
+.admin-stat-icon {
+  @apply w-12 h-12 rounded-lg bg-primary-500/10 flex items-center justify-center text-primary-400;
+}
+
+.admin-stat-value {
+  @apply text-2xl font-bold text-white;
+}
+
+.admin-stat-label {
+  @apply text-sm text-dark-400;
+}
+
+/* Admin Tables */
+.admin-table {
+  @apply w-full;
+}
+
+.admin-table th {
+  @apply px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase tracking-wider bg-dark-800/50;
+}
+
+.admin-table td {
+  @apply px-4 py-4 text-sm text-dark-200 border-t border-dark-700;
+}
+
+.admin-table tr:hover td {
+  @apply bg-dark-800/50;
+}
+
+/* Admin Forms */
+.admin-form-group {
+  @apply space-y-2;
+}
+
+.admin-label {
+  @apply block text-sm font-medium text-dark-300;
+}
+
+.admin-input {
+  @apply w-full px-4 py-3 bg-dark-800 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all duration-200;
+}
+
+.admin-textarea {
+  @apply admin-input min-h-[120px] resize-y;
+}
+
+.admin-select {
+  @apply admin-input appearance-none cursor-pointer;
+}
+
+/* Admin Buttons */
+.admin-btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.admin-btn-primary {
+  @apply admin-btn bg-primary-500 text-white hover:bg-primary-600 shadow-lg shadow-primary-500/25;
+}
+
+.admin-btn-secondary {
+  @apply admin-btn bg-dark-700 text-white hover:bg-dark-600;
+}
+
+.admin-btn-danger {
+  @apply admin-btn bg-red-500/10 text-red-400 hover:bg-red-500/20;
+}
+
+.admin-btn-ghost {
+  @apply admin-btn hover:bg-dark-700;
+}
+
+/* Admin Navigation */
+.admin-nav-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-lg text-dark-300 hover:text-white hover:bg-dark-800 transition-all duration-200;
+}
+
+.admin-nav-item.active {
+  @apply text-primary-400 bg-primary-500/10;
+}
+
+/* Admin Badge */
+.admin-badge {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+}
+
+.admin-badge-success {
+  @apply admin-badge bg-green-500/10 text-green-400;
+}
+
+.admin-badge-warning {
+  @apply admin-badge bg-yellow-500/10 text-yellow-400;
+}
+
+.admin-badge-danger {
+  @apply admin-badge bg-red-500/10 text-red-400;
+}
+
+.admin-badge-info {
+  @apply admin-badge bg-blue-500/10 text-blue-400;
+}
+
+.admin-badge-neutral {
+  @apply admin-badge bg-dark-600 text-dark-300;
+}
+
+/* Inbox Status */
+.inbox-status-new {
+  @apply admin-badge-info;
+}
+
+.inbox-status-in_progress {
+  @apply admin-badge-warning;
+}
+
+.inbox-status-replied {
+  @apply admin-badge-success;
+}
+
+.inbox-status-archived {
+  @apply admin-badge-neutral;
+}
+
+.inbox-status-spam {
+  @apply admin-badge-danger;
+}
+
+/* RTL adjustments */
+[dir="rtl"] .admin-sidebar {
+  @apply lg:translate-x-0;
+}
+
+[dir="rtl"] .admin-table th {
+  @apply text-right;
+}

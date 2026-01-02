@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "title": "Mohamed Sayed Sangak",
+    "description": "Medical Student at Sohag University - Personal portfolio showcasing projects and skills",
+    "keywords": "Mohamed Sangak, medical student, developer, Telegram bots, Sohag"
+  },
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "skills": "Skills",
+    "projects": "Projects",
+    "blog": "Blog",
+    "contact": "Contact"
+  },
+  "hero": {
+    "greeting": "Hello, I'm",
+    "name": "Mohamed Sayed Sangak",
+    "title": "Medical Student",
+    "subtitle": "Student at Faculty of Medicine - Sohag University",
+    "cta": {
+      "projects": "View My Projects",
+      "contact": "Contact Me"
+    }
+  },
+  "about": {
+    "title": "About Me",
+    "subtitle": "Get to know me better",
+    "education": "Education",
+    "university": "University",
+    "faculty": "Faculty",
+    "year": "Academic Year",
+    "location": "Location",
+    "downloadCV": "Download CV"
+  },
+  "skills": {
+    "title": "Skills",
+    "subtitle": "What I'm good at",
+    "categories": {
+      "programming": "Programming",
+      "technical": "Technical",
+      "soft": "Soft Skills"
+    }
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "My Featured Work",
+    "viewAll": "View All",
+    "viewProject": "View Project",
+    "caseStudy": "Case Study",
+    "private": "Private Project",
+    "privateNote": "This is a private project and full details cannot be shared",
+    "technologies": "Technologies Used",
+    "highlights": "Key Highlights",
+    "role": "My Role",
+    "duration": "Duration",
+    "ongoing": "Ongoing",
+    "liveDemo": "Live Demo",
+    "sourceCode": "Source Code",
+    "noProjects": "No projects available"
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "My Articles & Thoughts",
+    "readMore": "Read More",
+    "readTime": "min read",
+    "publishedAt": "Published on",
+    "tags": "Tags",
+    "noPosts": "No posts available",
+    "backToBlog": "Back to Blog"
+  },
+  "contact": {
+    "title": "Contact Me",
+    "subtitle": "I'd love to hear from you",
+    "description": "Feel free to reach out for any inquiries or collaboration opportunities",
+    "form": {
+      "name": "Full Name",
+      "namePlaceholder": "Enter your full name",
+      "email": "Email Address",
+      "emailPlaceholder": "Enter your email address",
+      "whatsapp": "WhatsApp Number",
+      "whatsappPlaceholder": "Enter WhatsApp number with country code",
+      "preferredContact": "Preferred Contact Method",
+      "viaEmail": "Email",
+      "viaWhatsapp": "WhatsApp",
+      "subject": "Subject",
+      "subjectPlaceholder": "Message subject",
+      "message": "Message",
+      "messagePlaceholder": "Write your message here...",
+      "attachment": "Attachment (optional)",
+      "attachmentHint": "You can attach a file (PDF, image) - Max 5MB",
+      "submit": "Send Message",
+      "sending": "Sending...",
+      "success": "Your message has been sent successfully! I'll get back to you soon.",
+      "error": "An error occurred while sending. Please try again."
+    },
+    "info": {
+      "title": "Contact Information",
+      "email": "Email",
+      "social": "Social Media",
+      "location": "Location"
+    }
+  },
+  "footer": {
+    "designedBy": "Designed by",
+    "allRightsReserved": "All rights reserved",
+    "quickLinks": "Quick Links",
+    "connect": "Connect"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last Updated",
+    "sections": {
+      "intro": {
+        "title": "Introduction",
+        "content": "We respect your privacy and are committed to protecting your personal data. This policy explains how we collect, use, and protect your information."
+      },
+      "collection": {
+        "title": "Data We Collect",
+        "content": "We collect information you voluntarily provide when contacting us, such as your name, email address, and phone number."
+      },
+      "usage": {
+        "title": "How We Use Your Data",
+        "content": "We use your data to respond to your inquiries and communicate with you about projects or potential opportunities."
+      },
+      "protection": {
+        "title": "Data Protection",
+        "content": "We implement appropriate security measures to protect your data from unauthorized access, alteration, or disclosure."
+      },
+      "contact": {
+        "title": "Contact",
+        "content": "If you have any questions about this privacy policy, please contact us through the contact form."
+      }
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "back": "Back",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "search": "Search",
+    "noResults": "No results found",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "switch": "Change Language",
+    "current": "English",
+    "suggestion": "Would you like to switch to"
+  },
+  "errors": {
+    "404": {
+      "title": "Page Not Found",
+      "description": "Sorry, the page you're looking for doesn't exist.",
+      "backHome": "Back to Home"
+    },
+    "500": {
+      "title": "Server Error",
+      "description": "Sorry, an unexpected error occurred. Please try again later."
+    }
+  }
+}

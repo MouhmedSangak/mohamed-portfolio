@@ -1,0 +1,173 @@
+{
+  "metadata": {
+    "title": "Mohamed Sayed Sangak",
+    "description": "Medizinstudent an der Universität Sohag - Persönliches Portfolio mit Projekten und Fähigkeiten",
+    "keywords": "Mohamed Sangak, Medizinstudent, Entwickler, Telegram-Bots, Sohag"
+  },
+  "nav": {
+    "home": "Startseite",
+    "about": "Über mich",
+    "skills": "Fähigkeiten",
+    "projects": "Projekte",
+    "blog": "Blog",
+    "contact": "Kontakt"
+  },
+  "hero": {
+    "greeting": "Hallo, ich bin",
+    "name": "Mohamed Sayed Sangak",
+    "title": "Medizinstudent",
+    "subtitle": "Student an der Fakultät für Medizin - Universität Sohag",
+    "cta": {
+      "projects": "Meine Projekte",
+      "contact": "Kontaktieren"
+    }
+  },
+  "about": {
+    "title": "Über mich",
+    "subtitle": "Lernen Sie mich besser kennen",
+    "education": "Ausbildung",
+    "university": "Universität",
+    "faculty": "Fakultät",
+    "year": "Studienjahr",
+    "location": "Standort",
+    "downloadCV": "Lebenslauf herunterladen"
+  },
+  "skills": {
+    "title": "Fähigkeiten",
+    "subtitle": "Was ich gut kann",
+    "categories": {
+      "programming": "Programmierung",
+      "technical": "Technisch",
+      "soft": "Soft Skills"
+    }
+  },
+  "projects": {
+    "title": "Projekte",
+    "subtitle": "Meine ausgewählten Arbeiten",
+    "viewAll": "Alle anzeigen",
+    "viewProject": "Projekt ansehen",
+    "caseStudy": "Fallstudie",
+    "private": "Privates Projekt",
+    "privateNote": "Dies ist ein privates Projekt und vollständige Details können nicht geteilt werden",
+    "technologies": "Verwendete Technologien",
+    "highlights": "Wichtige Highlights",
+    "role": "Meine Rolle",
+    "duration": "Dauer",
+    "ongoing": "Laufend",
+    "liveDemo": "Live-Demo",
+    "sourceCode": "Quellcode",
+    "noProjects": "Keine Projekte verfügbar"
+  },
+  "blog": {
+    "title": "Blog",
+    "subtitle": "Meine Artikel & Gedanken",
+    "readMore": "Weiterlesen",
+    "readTime": "Min. Lesezeit",
+    "publishedAt": "Veröffentlicht am",
+    "tags": "Tags",
+    "noPosts": "Keine Beiträge verfügbar",
+    "backToBlog": "Zurück zum Blog"
+  },
+  "contact": {
+    "title": "Kontakt",
+    "subtitle": "Ich freue mich von Ihnen zu hören",
+    "description": "Kontaktieren Sie mich gerne bei Fragen oder Zusammenarbeitsmöglichkeiten",
+    "form": {
+      "name": "Vollständiger Name",
+      "namePlaceholder": "Geben Sie Ihren vollständigen Namen ein",
+      "email": "E-Mail-Adresse",
+      "emailPlaceholder": "Geben Sie Ihre E-Mail-Adresse ein",
+      "whatsapp": "WhatsApp-Nummer",
+      "whatsappPlaceholder": "WhatsApp-Nummer mit Ländervorwahl eingeben",
+      "preferredContact": "Bevorzugte Kontaktmethode",
+      "viaEmail": "E-Mail",
+      "viaWhatsapp": "WhatsApp",
+      "subject": "Betreff",
+      "subjectPlaceholder": "Nachrichtenbetreff",
+      "message": "Nachricht",
+      "messagePlaceholder": "Schreiben Sie Ihre Nachricht hier...",
+      "attachment": "Anhang (optional)",
+      "attachmentHint": "Sie können eine Datei anhängen (PDF, Bild) - Max. 5MB",
+      "submit": "Nachricht senden",
+      "sending": "Wird gesendet...",
+      "success": "Ihre Nachricht wurde erfolgreich gesendet! Ich werde mich bald bei Ihnen melden.",
+      "error": "Beim Senden ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+    },
+    "info": {
+      "title": "Kontaktinformationen",
+      "email": "E-Mail",
+      "social": "Soziale Medien",
+      "location": "Standort"
+    }
+  },
+  "footer": {
+    "designedBy": "Gestaltet von",
+    "allRightsReserved": "Alle Rechte vorbehalten",
+    "quickLinks": "Schnelllinks",
+    "connect": "Verbinden"
+  },
+  "privacy": {
+    "title": "Datenschutzerklärung",
+    "lastUpdated": "Letzte Aktualisierung",
+    "sections": {
+      "intro": {
+        "title": "Einleitung",
+        "content": "Wir respektieren Ihre Privatsphäre und verpflichten uns, Ihre persönlichen Daten zu schützen. Diese Richtlinie erklärt, wie wir Ihre Informationen sammeln, verwenden und schützen."
+      },
+      "collection": {
+        "title": "Daten, die wir sammeln",
+        "content": "Wir sammeln Informationen, die Sie freiwillig bei der Kontaktaufnahme angeben, wie Ihren Namen, Ihre E-Mail-Adresse und Telefonnummer."
+      },
+      "usage": {
+        "title": "Wie wir Ihre Daten verwenden",
+        "content": "Wir verwenden Ihre Daten, um auf Ihre Anfragen zu antworten und mit Ihnen über Projekte oder potenzielle Möglichkeiten zu kommunizieren."
+      },
+      "protection": {
+        "title": "Datenschutz",
+        "content": "Wir implementieren angemessene Sicherheitsmaßnahmen, um Ihre Daten vor unbefugtem Zugriff, Änderung oder Offenlegung zu schützen."
+      },
+      "contact": {
+        "title": "Kontakt",
+        "content": "Wenn Sie Fragen zu dieser Datenschutzerklärung haben, kontaktieren Sie uns bitte über das Kontaktformular."
+      }
+    }
+  },
+  "common": {
+    "loading": "Wird geladen...",
+    "error": "Ein Fehler ist aufgetreten",
+    "retry": "Erneut versuchen",
+    "back": "Zurück",
+    "close": "Schließen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "view": "Ansehen",
+    "search": "Suchen",
+    "noResults": "Keine Ergebnisse gefunden",
+    "confirm": "Bestätigen",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "theme": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "language": {
+    "switch": "Sprache ändern",
+    "current": "Deutsch",
+    "suggestion": "Möchten Sie wechseln zu"
+  },
+  "errors": {
+    "404": {
+      "title": "Seite nicht gefunden",
+      "description": "Entschuldigung, die gesuchte Seite existiert nicht.",
+      "backHome": "Zurück zur Startseite"
+    },
+    "500": {
+      "title": "Serverfehler",
+      "description": "Entschuldigung, ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es später erneut."
+    }
+  }
+}
