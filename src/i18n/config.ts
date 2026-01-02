@@ -1,5 +1,5 @@
 // ============================================
-// i18n Configuration
+// src/i18n/config.ts - i18n Configuration
 // ============================================
 
 export const locales = ['ar', 'en', 'de'] as const;

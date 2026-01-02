@@ -1,8 +1,8 @@
 // ============================================
-// Supabase Server Client
+// src/lib/supabase/server.ts - النسخة المصححة
 // ============================================
 
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from '@/types/database';
 
@@ -17,18 +17,18 @@ export function createServerSupabaseClient() {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
-        set(name: string, value: string, options: CookieOptions) {
+        set(name: string, value: string, options: any) {
           try {
             cookieStore.set({ name, value, ...options });
-          } catch (error) {
-            // Handle cookies in Server Components
+          } catch {
+            // Server Component - ignore
           }
         },
-        remove(name: string, options: CookieOptions) {
+        remove(name: string, options: any) {
           try {
-            cookieStore.set({ name, value: '', ...options });
-          } catch (error) {
-            // Handle cookies in Server Components
+            cookieStore.delete({ name, ...options });
+          } catch {
+            // Server Component - ignore
           }
         },
       },
@@ -39,12 +39,9 @@ export function createServerSupabaseClient() {
 export async function getSession() {
   const supabase = createServerSupabaseClient();
   try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     return session;
-  } catch (error) {
-    console.error('Error getting session:', error);
+  } catch {
     return null;
   }
 }
@@ -52,12 +49,9 @@ export async function getSession() {
 export async function getUser() {
   const supabase = createServerSupabaseClient();
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     return user;
-  } catch (error) {
-    console.error('Error getting user:', error);
+  } catch {
     return null;
   }
 }

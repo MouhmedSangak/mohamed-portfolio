@@ -1,7 +1,12 @@
+// ============================================
+// middleware.ts - Next.js Middleware
+// ============================================
+
 import createMiddleware from 'next-intl/middleware';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { locales, defaultLocale } from '@/src/i18n/config';
+import { NextRequest, NextResponse } from 'next/server';
+
+const locales = ['ar', 'en', 'de'];
+const defaultLocale = 'ar';
 
 const intlMiddleware = createMiddleware({
   locales,
@@ -12,14 +17,16 @@ const intlMiddleware = createMiddleware({
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip middleware for admin routes, API routes, and static files
-  if (
+  // استثناء مسارات معينة من الـ middleware
+  const shouldSkip = 
     pathname.startsWith('/admin') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/images') ||
-    pathname.includes('.')
-  ) {
+    pathname.includes('.') ||
+    pathname === '/favicon.ico';
+
+  if (shouldSkip) {
     return NextResponse.next();
   }
 
@@ -27,5 +34,6 @@ export default function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|admin|.*\\..*).*)'],
+  // تطبيق الـ middleware على جميع المسارات ما عدا المستثناة
+  matcher: ['/((?!api|_next|admin|images|.*\\..*).*)'],
 };
