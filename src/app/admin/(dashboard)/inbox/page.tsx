@@ -9,31 +9,38 @@ import { motion } from 'framer-motion';
 import {
   Inbox,
   Search,
-  Filter,
   RefreshCw,
   Trash2,
   Archive,
   Check,
-  MailOpen,
+  Mail,
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase/client';
 import { useToastActions } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Modal, ConfirmModal } from '@/components/ui/Modal';
+import { ConfirmModal } from '@/components/ui/Modal';
 import { InboxItem } from '@/components/admin/InboxItem';
 import { cn } from '@/lib/utils/cn';
 import type { ContactMessage } from '@/types/database';
 
-type FilterStatus = 'all' | ContactMessage['status'];
+// Computed status based on message fields
+type MessageStatus = 'new' | 'read' | 'replied' | 'archived';
+type FilterStatus = 'all' | MessageStatus;
+
+// Helper function to compute status from message
+const getMessageStatus = (message: ContactMessage): MessageStatus => {
+  if (message.is_archived) return 'archived';
+  if (message.replied_at) return 'replied';
+  if (message.is_read) return 'read';
+  return 'new';
+};
 
 const filterTabs: { key: FilterStatus; label: string; icon?: React.ReactNode }[] = [
   { key: 'all', label: 'All' },
   { key: 'new', label: 'New', icon: <span className="w-2 h-2 rounded-full bg-blue-500" /> },
-  { key: 'in_progress', label: 'In Progress' },
+  { key: 'read', label: 'Read' },
   { key: 'replied', label: 'Replied' },
   { key: 'archived', label: 'Archived' },
-  { key: 'spam', label: 'Spam' },
 ];
 
 export default function InboxPage() {
@@ -52,62 +59,87 @@ export default function InboxPage() {
   const fetchMessages = useCallback(async () => {
     setIsLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('contact_messages')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (filterStatus !== 'all') {
-        query = query.eq('status', filterStatus);
-      }
-
-      const { data, error } = await query;
-      
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data as ContactMessage[]) || []);
     } catch (error) {
       console.error('Fetch error:', error);
       toast.error('Failed to load messages');
     } finally {
       setIsLoading(false);
     }
-  }, [supabase, filterStatus, toast]);
+  }, [supabase, toast]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Filter by search
-  const filteredMessages = searchQuery
-    ? messages.filter(
-        (m) =>
-          m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          m.subject.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : messages;
+  // Filter messages by status and search
+  const filteredMessages = messages.filter((m) => {
+    // Filter by status
+    if (filterStatus !== 'all') {
+      const status = getMessageStatus(m);
+      if (status !== filterStatus) return false;
+    }
+    
+    // Filter by search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        m.name.toLowerCase().includes(query) ||
+        m.email.toLowerCase().includes(query) ||
+        (m.subject?.toLowerCase() || '').includes(query)
+      );
+    }
+    
+    return true;
+  });
 
   // Count by status
   const statusCounts = messages.reduce((acc, m) => {
-    acc[m.status] = (acc[m.status] || 0) + 1;
+    const status = getMessageStatus(m);
+    acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   // Handle status change
-  const handleStatusChange = async (id: string, status: ContactMessage['status']) => {
+  const handleStatusChange = async (id: string, newStatus: MessageStatus) => {
     try {
+      const updateData: Partial<ContactMessage> = {};
+      
+      switch (newStatus) {
+        case 'new':
+          updateData.is_read = false;
+          updateData.is_archived = false;
+          updateData.replied_at = null;
+          break;
+        case 'read':
+          updateData.is_read = true;
+          updateData.is_archived = false;
+          break;
+        case 'replied':
+          updateData.is_read = true;
+          updateData.replied_at = new Date().toISOString();
+          updateData.is_archived = false;
+          break;
+        case 'archived':
+          updateData.is_archived = true;
+          break;
+      }
+
       const { error } = await supabase
         .from('contact_messages')
-        .update({ 
-          status,
-          ...(status === 'replied' ? { replied_at: new Date().toISOString() } : {})
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
 
       setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, status } : m))
+        prev.map((m) => (m.id === id ? { ...m, ...updateData } : m))
       );
       toast.success('Status updated');
     } catch (error) {
@@ -149,16 +181,25 @@ export default function InboxPage() {
         
         if (error) throw error;
         setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
-      } else {
-        const status = action === 'archive' ? 'archived' : 'replied';
+      } else if (action === 'archive') {
         const { error } = await supabase
           .from('contact_messages')
-          .update({ status })
+          .update({ is_archived: true })
           .in('id', ids);
         
         if (error) throw error;
         setMessages((prev) =>
-          prev.map((m) => (ids.includes(m.id) ? { ...m, status } : m))
+          prev.map((m) => (ids.includes(m.id) ? { ...m, is_archived: true } : m))
+        );
+      } else if (action === 'mark_read') {
+        const { error } = await supabase
+          .from('contact_messages')
+          .update({ is_read: true })
+          .in('id', ids);
+        
+        if (error) throw error;
+        setMessages((prev) =>
+          prev.map((m) => (ids.includes(m.id) ? { ...m, is_read: true } : m))
         );
       }
 
@@ -258,7 +299,7 @@ export default function InboxPage() {
               onClick={() => handleBulkAction('mark_read')}
               leftIcon={<Check className="h-4 w-4" />}
             >
-              Mark Replied
+              Mark Read
             </Button>
             <Button
               size="sm"
@@ -309,6 +350,7 @@ export default function InboxPage() {
               <InboxItem
                 key={message.id}
                 message={message}
+                status={getMessageStatus(message)}
                 isSelected={selectedIds.has(message.id)}
                 onSelect={toggleSelect}
                 onStatusChange={handleStatusChange}
@@ -319,7 +361,7 @@ export default function InboxPage() {
           </div>
         ) : (
           <div className="py-16 text-center">
-            <Inbox className="h-12 w-12 text-dark-500 mx-auto mb-4" />
+            <Mail className="h-12 w-12 text-dark-500 mx-auto mb-4" />
             <p className="text-dark-400">
               {searchQuery
                 ? 'No messages match your search'
@@ -328,6 +370,53 @@ export default function InboxPage() {
           </div>
         )}
       </div>
+
+      {/* Message Detail Modal */}
+      {selectedMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="w-full max-w-2xl bg-dark-900 rounded-xl border border-dark-700 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white">{selectedMessage.name}</h2>
+                <p className="text-dark-400">{selectedMessage.email}</p>
+              </div>
+              <button
+                onClick={() => setSelectedMessage(null)}
+                className="text-dark-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            {selectedMessage.subject && (
+              <h3 className="text-lg font-medium text-white mb-2">
+                {selectedMessage.subject}
+              </h3>
+            )}
+            <p className="text-dark-300 whitespace-pre-wrap">
+              {selectedMessage.message}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  handleStatusChange(selectedMessage.id, 'replied');
+                  setSelectedMessage(null);
+                }}
+              >
+                Mark as Replied
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  window.location.href = `mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject || 'Your message'}`;
+                }}
+              >
+                Reply via Email
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation */}
       <ConfirmModal
