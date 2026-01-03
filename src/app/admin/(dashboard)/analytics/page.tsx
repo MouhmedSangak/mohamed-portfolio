@@ -81,12 +81,11 @@ export default function AnalyticsPage() {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - days);
 
-      // Fetch all events in period
+      // Fetch all events in period - تم تصحيح اسم الجدول
       const { data, error } = await supabase
-        .from('analytics_events')
+        .from('analytics')
         .select('*')
-        .gte('created_at', startDate.toISOString())
-        .eq('event_type', 'pageview');
+        .gte('created_at', startDate.toISOString());
 
       if (error) throw error;
 
@@ -121,8 +120,8 @@ export default function AnalyticsPage() {
         dailyMap[date].pageviews++;
         uniqueVisitors.add(event.visitor_id);
 
-        // Device stats
-        const deviceType = event.device_type || 'desktop';
+        // Device stats - تم تصحيح اسم الحقل من device_type إلى device
+        const deviceType = event.device || 'desktop';
         if (deviceType in devices) {
           devices[deviceType as keyof DeviceStats]++;
         }
@@ -176,6 +175,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   const maxPageviews = Math.max(...dailyData.map((d) => d.pageviews), 1);
