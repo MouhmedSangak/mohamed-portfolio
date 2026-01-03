@@ -9,5 +9,8 @@ export function createClient() {
   );
 }
 
+// Alias for backward compatibility
+export const getSupabaseClient = createClient;
+
 // Export typed client for direct use
 export type SupabaseClient = ReturnType<typeof createClient>;
