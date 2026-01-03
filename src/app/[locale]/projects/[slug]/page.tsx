@@ -6,7 +6,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, ExternalLink, Github, Lock, Calendar, User } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Github, Calendar } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { getTranslations } from 'next-intl/server';
@@ -14,7 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { AnimatedSection } from '@/components/layout/PageTransition';
-import { formatMonthYear } from '@/lib/utils/formatDate';
+import { formatDate } from '@/lib/utils/formatDate';
 import type { Locale } from '@/i18n/config';
 import type { Project } from '@/types/database';
 
@@ -28,7 +28,6 @@ async function getProject(slug: string): Promise<Project | null> {
     .from('projects')
     .select('*')
     .eq('slug', slug)
-    .eq('status', 'published')
     .eq('is_visible', true)
     .single();
   
@@ -51,7 +50,6 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
 
   const locale = params.locale as Locale;
   
-  // استخدام Type assertion لتجنب خطأ TypeScript
   const titleKey = `title_${locale}` as keyof Project;
   const descriptionKey = `description_${locale}` as keyof Project;
   
@@ -62,7 +60,7 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
     title,
     description,
     openGraph: {
-      images: project.thumbnail_url ? [project.thumbnail_url] : [],
+      images: project.cover_image_url ? [project.cover_image_url] : [],
     },
   };
 }
@@ -78,18 +76,13 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const locale = params.locale as Locale;
   const isRTL = locale === 'ar';
 
-  // استخدام Type assertion
   const titleKey = `title_${locale}` as keyof Project;
   const descriptionKey = `description_${locale}` as keyof Project;
   const contentKey = `content_${locale}` as keyof Project;
-  const roleKey = `role_${locale}` as keyof Project;
-  const highlightsKey = `highlights_${locale}` as keyof Project;
 
   const title = (project[titleKey] as string) || project.title_en;
   const description = (project[descriptionKey] as string) || project.description_en;
   const content = (project[contentKey] as string) || project.content_en;
-  const role = (project[roleKey] as string) || project.role_en;
-  const highlights = (project[highlightsKey] as string[]) || (project.highlights_en as string[]) || [];
   const technologies = (project.technologies as string[]) || [];
 
   return (
@@ -110,12 +103,6 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           <div className="max-w-4xl">
             {/* Badges */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
-              {project.is_private && (
-                <Badge variant="warning" className="flex items-center gap-1">
-                  <Lock className="h-3 w-3" />
-                  {t('private')}
-                </Badge>
-              )}
               {project.is_featured && (
                 <Badge variant="primary">⭐ Featured</Badge>
               )}
@@ -133,28 +120,18 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
             {/* Meta Info */}
             <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground mb-8">
-              {role && (
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>{t('role')}: {role}</span>
-                </div>
-              )}
-              {(project.start_date || project.end_date) && (
+              {project.created_at && (
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  <span>
-                    {project.start_date && formatMonthYear(project.start_date, locale)}
-                    {project.end_date && ` - ${formatMonthYear(project.end_date, locale)}`}
-                    {project.is_ongoing && ` - ${t('ongoing')}`}
-                  </span>
+                  <span>{formatDate(project.created_at, locale)}</span>
                 </div>
               )}
             </div>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3 mb-8">
-              {project.project_url && project.is_public_link && (
-                <a href={project.project_url} target="_blank" rel="noopener noreferrer">
+              {project.live_url && (
+                <a href={project.live_url} target="_blank" rel="noopener noreferrer">
                   <Button leftIcon={<ExternalLink className="h-4 w-4" />}>
                     {t('liveDemo')}
                   </Button>
@@ -171,36 +148,17 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
           </div>
         </AnimatedSection>
 
-        {/* Thumbnail */}
-        {project.thumbnail_url && (
+        {/* Cover Image */}
+        {project.cover_image_url && (
           <AnimatedSection delay={0.2} className="mb-12">
             <div className="relative aspect-video rounded-2xl overflow-hidden">
               <Image
-                src={project.thumbnail_url}
+                src={project.cover_image_url}
                 alt={title}
                 fill
                 className="object-cover"
                 priority
               />
-            </div>
-          </AnimatedSection>
-        )}
-
-        {/* Private Notice */}
-        {project.is_private && (
-          <AnimatedSection delay={0.25}>
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6 mb-8">
-              <div className="flex items-start gap-3">
-                <Lock className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold text-foreground mb-1">
-                    {t('private')}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t('privateNote')}
-                  </p>
-                </div>
-              </div>
             </div>
           </AnimatedSection>
         )}
@@ -235,20 +193,24 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
               </div>
             )}
 
-            {/* Highlights */}
-            {highlights.length > 0 && (
+            {/* Project Images Gallery */}
+            {project.images && project.images.length > 0 && (
               <div className="bg-dark-50 dark:bg-dark-800 rounded-xl p-6">
                 <h3 className="font-semibold text-foreground mb-4">
-                  {t('highlights')}
+                  {isRTL ? 'صور المشروع' : 'Project Gallery'}
                 </h3>
-                <ul className="space-y-2">
-                  {highlights.map((highlight, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="text-primary-500 mt-1">•</span>
-                      {highlight}
-                    </li>
+                <div className="grid grid-cols-2 gap-2">
+                  {project.images.map((image, index) => (
+                    <div key={index} className="relative aspect-video rounded-lg overflow-hidden">
+                      <Image
+                        src={image}
+                        alt={`${title} - ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </AnimatedSection>
