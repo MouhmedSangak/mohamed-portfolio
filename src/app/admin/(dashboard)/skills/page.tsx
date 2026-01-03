@@ -1,462 +1,507 @@
-// ============================================
-// Admin Skills Management Page
-// ============================================
-
+// src/app/admin/(dashboard)/skills/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { motion, Reorder } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient, createUntypedClient } from '@/lib/supabase/client';
 import {
   Plus,
-  Lightbulb,
+  Search,
   Edit,
   Trash2,
-  GripVertical,
   Eye,
   EyeOff,
+  RefreshCw,
   Save,
   X,
+  GripVertical,
+  Code,
+  Palette,
+  Users,
+  Briefcase,
 } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import { useToastActions } from '@/components/ui/Toast';
-import { Button } from '@/components/ui/Button';
-import { Input, Textarea } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Dropdown';
-import { Toggle } from '@/components/ui/Toggle';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Modal, ConfirmModal } from '@/components/ui/Modal';
-import { cn } from '@/lib/utils/cn';
-import type { Skill } from '@/types/database';
 
-const categories = [
-  { value: 'programming', label: 'Programming' },
-  { value: 'technical', label: 'Technical' },
-  { value: 'soft', label: 'Soft Skills' },
-];
-
-const icons = [
-  'code', 'database', 'globe', 'bot', 'lightbulb', 'users', 'briefcase', 'zap',
-];
-
-interface SkillFormData {
+// تعريف نوع المهارة مباشرة لتجنب مشاكل الأنواع
+interface Skill {
+  id: string;
   name_ar: string;
   name_en: string;
-  name_de: string;
-  description_ar: string;
-  description_en: string;
-  description_de: string;
+  name_de: string | null;
+  description_ar: string | null;
+  description_en: string | null;
+  description_de: string | null;
   category: string;
-  icon: string;
+  icon: string | null;
   proficiency: number;
+  display_order: number;
   is_visible: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-const initialFormData: SkillFormData = {
+const categoryConfig: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+  programming: { label: 'برمجة', icon: Code, color: 'bg-blue-500' },
+  technical: { label: 'تقني', icon: Briefcase, color: 'bg-purple-500' },
+  soft: { label: 'مهارات شخصية', icon: Users, color: 'bg-green-500' },
+  design: { label: 'تصميم', icon: Palette, color: 'bg-pink-500' },
+};
+
+const defaultSkill: Partial<Skill> = {
   name_ar: '',
   name_en: '',
   name_de: '',
   description_ar: '',
   description_en: '',
   description_de: '',
-  category: 'technical',
+  category: 'programming',
   icon: 'code',
   proficiency: 80,
   is_visible: true,
+  display_order: 0,
 };
 
 export default function SkillsPage() {
-  const supabase = getSupabaseClient();
-  const toast = useToastActions();
-
   const [skills, setSkills] = useState<Skill[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
-  const [formData, setFormData] = useState<SkillFormData>(initialFormData);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingSkill, setEditingSkill] = useState<Partial<Skill> | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const supabase = createClient();
+  const untypedSupabase = createUntypedClient();
 
   // Fetch skills
-  const fetchSkills = async () => {
-    setIsLoading(true);
+  const fetchSkills = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('skills')
         .select('*')
-        .order('display_order');
+        .order('display_order', { ascending: true });
+
+      if (categoryFilter !== 'all') {
+        query = query.eq('category', categoryFilter);
+      }
+
+      if (searchQuery) {
+        query = query.or(`name_ar.ilike.%${searchQuery}%,name_en.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      setSkills(data || []);
+      setSkills((data as Skill[]) || []);
     } catch (error) {
-      console.error('Fetch error:', error);
-      toast.error('Failed to load skills');
+      console.error('Error fetching skills:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }, [supabase, categoryFilter, searchQuery]);
 
   useEffect(() => {
     fetchSkills();
-  }, []);
+  }, [fetchSkills]);
 
-  // Handle form open
-  const openForm = (skill?: Skill) => {
-    if (skill) {
-      setEditingSkill(skill);
-      setFormData({
-        name_ar: skill.name_ar,
-        name_en: skill.name_en,
-        name_de: skill.name_de || '',
-        description_ar: skill.description_ar || '',
-        description_en: skill.description_en || '',
-        description_de: skill.description_de || '',
-        category: skill.category,
-        icon: skill.icon || 'code',
-        proficiency: skill.proficiency,
-        is_visible: skill.is_visible,
-      });
-    } else {
-      setEditingSkill(null);
-      setFormData(initialFormData);
-    }
-    setShowForm(true);
+  // Open modal for new skill
+  const openNewModal = () => {
+    setEditingSkill({ ...defaultSkill });
+    setIsModalOpen(true);
   };
 
-  // Handle form submit
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Open modal for editing
+  const openEditModal = (skill: Skill) => {
+    setEditingSkill({
+      id: skill.id,
+      name_ar: skill.name_ar,
+      name_en: skill.name_en,
+      name_de: skill.name_de || '',
+      description_ar: skill.description_ar || '',
+      description_en: skill.description_en || '',
+      description_de: skill.description_de || '',
+      category: skill.category,
+      icon: skill.icon || '',
+      proficiency: skill.proficiency,
+      is_visible: skill.is_visible,
+      display_order: skill.display_order,
+    });
+    setIsModalOpen(true);
+  };
 
-    if (!formData.name_en.trim()) {
-      toast.error('English name is required');
-      return;
-    }
+  // Save skill
+  const saveSkill = async () => {
+    if (!editingSkill) return;
 
-    setIsSubmitting(true);
-
+    setSaving(true);
     try {
-      if (editingSkill) {
-        const { error } = await supabase
+      const skillData = {
+        name_ar: editingSkill.name_ar,
+        name_en: editingSkill.name_en,
+        name_de: editingSkill.name_de || null,
+        description_ar: editingSkill.description_ar || null,
+        description_en: editingSkill.description_en || null,
+        description_de: editingSkill.description_de || null,
+        category: editingSkill.category,
+        icon: editingSkill.icon || null,
+        proficiency: editingSkill.proficiency,
+        is_visible: editingSkill.is_visible,
+        display_order: editingSkill.display_order,
+      };
+
+      if (editingSkill.id) {
+        // Update
+        const { error } = await untypedSupabase
           .from('skills')
-          .update(formData)
+          .update(skillData)
           .eq('id', editingSkill.id);
 
         if (error) throw error;
-        toast.success('Skill updated');
       } else {
-        const maxOrder = Math.max(...skills.map((s) => s.display_order), 0);
-        const { error } = await supabase
+        // Insert
+        const { error } = await untypedSupabase
           .from('skills')
-          .insert({ ...formData, display_order: maxOrder + 1 });
+          .insert(skillData);
 
         if (error) throw error;
-        toast.success('Skill created');
       }
 
-      setShowForm(false);
+      setIsModalOpen(false);
+      setEditingSkill(null);
       fetchSkills();
-    } catch (error: any) {
-      console.error('Submit error:', error);
-      toast.error(error.message || 'Failed to save skill');
+    } catch (error) {
+      console.error('Error saving skill:', error);
     } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle delete
-  const handleDelete = async () => {
-    if (!deleteId) return;
-
-    try {
-      const { error } = await supabase
-        .from('skills')
-        .delete()
-        .eq('id', deleteId);
-
-      if (error) throw error;
-
-      setSkills((prev) => prev.filter((s) => s.id !== deleteId));
-      toast.success('Skill deleted');
-      setDeleteId(null);
-    } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete skill');
-    }
-  };
-
-  // Handle reorder
-  const handleReorder = async (newOrder: Skill[]) => {
-    setSkills(newOrder);
-
-    try {
-      const updates = newOrder.map((skill, index) => ({
-        id: skill.id,
-        display_order: index,
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('skills')
-          .update({ display_order: update.display_order })
-          .eq('id', update.id);
-      }
-    } catch (error) {
-      console.error('Reorder error:', error);
-      toast.error('Failed to save order');
-      fetchSkills(); // Revert on error
+      setSaving(false);
     }
   };
 
   // Toggle visibility
   const toggleVisibility = async (skill: Skill) => {
     try {
-      const { error } = await supabase
+      const { error } = await untypedSupabase
         .from('skills')
         .update({ is_visible: !skill.is_visible })
         .eq('id', skill.id);
 
       if (error) throw error;
 
-      setSkills((prev) =>
-        prev.map((s) =>
+      setSkills(prev =>
+        prev.map(s =>
           s.id === skill.id ? { ...s, is_visible: !s.is_visible } : s
         )
       );
     } catch (error) {
-      console.error('Toggle error:', error);
-      toast.error('Failed to update');
+      console.error('Error toggling visibility:', error);
     }
   };
 
-  // Group by category
-  const groupedSkills = skills.reduce((acc, skill) => {
-    const cat = skill.category || 'technical';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(skill);
-    return acc;
-  }, {} as Record<string, Skill[]>);
+  // Delete skill
+  const deleteSkill = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه المهارة؟')) return;
+
+    try {
+      const { error } = await supabase
+        .from('skills')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSkills(prev => prev.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Error deleting skill:', error);
+    }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Skills</h1>
-          <p className="text-dark-400">
-            Manage your skills and expertise
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            المهارات
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            إدارة مهاراتك وخبراتك
           </p>
         </div>
-        <Button
-          onClick={() => openForm()}
-          leftIcon={<Plus className="h-4 w-4" />}
+        <button
+          onClick={openNewModal}
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          Add Skill
-        </Button>
+          <Plus className="w-5 h-5" />
+          إضافة مهارة
+        </button>
       </div>
 
-      {/* Skills by Category */}
-      {isLoading ? (
-        <div className="grid gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-32 bg-dark-800 rounded-xl animate-pulse" />
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="بحث في المهارات..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pr-10 pl-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="all">جميع الفئات</option>
+          {Object.entries(categoryConfig).map(([key, config]) => (
+            <option key={key} value={key}>{config.label}</option>
           ))}
+        </select>
+
+        <button
+          onClick={fetchSkills}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Skills Grid */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : skills.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            لا توجد مهارات بعد
+          </p>
+          <button
+            onClick={openNewModal}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <Plus className="w-5 h-5" />
+            إضافة أول مهارة
+          </button>
         </div>
       ) : (
-        <div className="space-y-8">
-          {Object.entries(groupedSkills).map(([category, categorySkills]) => (
-            <div key={category}>
-              <h2 className="text-lg font-semibold text-white mb-4 capitalize">
-                {category.replace('_', ' ')}
-              </h2>
-              <Reorder.Group
-                axis="y"
-                values={categorySkills}
-                onReorder={(newOrder) => {
-                  const otherSkills = skills.filter((s) => s.category !== category);
-                  handleReorder([...otherSkills, ...newOrder]);
-                }}
-                className="space-y-2"
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {skills.map((skill) => {
+            const category = categoryConfig[skill.category] || categoryConfig.programming;
+            const CategoryIcon = category.icon;
+            
+            return (
+              <div
+                key={skill.id}
+                className={`bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 ${
+                  !skill.is_visible ? 'opacity-60' : ''
+                }`}
               >
-                {categorySkills.map((skill) => (
-                  <Reorder.Item
-                    key={skill.id}
-                    value={skill}
-                    className="bg-dark-800 rounded-xl border border-dark-700 p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      <GripVertical className="h-5 w-5 text-dark-500 cursor-grab active:cursor-grabbing" />
-                      
-                      <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center">
-                        <Lightbulb className="h-5 w-5 text-primary-500" />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-white">
-                            {skill.name_en}
-                          </span>
-                          <span className="text-sm text-dark-400">
-                            {skill.name_ar}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 mt-1">
-                          <div className="flex-1 max-w-xs h-2 bg-dark-700 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary-500 to-accent-500 rounded-full"
-                              style={{ width: `${skill.proficiency}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-dark-400">
-                            {skill.proficiency}%
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleVisibility(skill)}
-                          className="p-2 rounded-lg hover:bg-dark-700 transition-colors"
-                        >
-                          {skill.is_visible ? (
-                            <Eye className="h-4 w-4 text-green-400" />
-                          ) : (
-                            <EyeOff className="h-4 w-4 text-dark-400" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => openForm(skill)}
-                          className="p-2 rounded-lg hover:bg-dark-700 transition-colors"
-                        >
-                          <Edit className="h-4 w-4 text-dark-400" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(skill.id)}
-                          className="p-2 rounded-lg hover:bg-dark-700 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-400" />
-                        </button>
-                      </div>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${category.color} bg-opacity-10`}>
+                      <CategoryIcon className={`w-5 h-5 text-${category.color.replace('bg-', '')}`} />
                     </div>
-                  </Reorder.Item>
-                ))}
-              </Reorder.Group>
-            </div>
-          ))}
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                        {skill.name_ar}
+                      </h3>
+                      <p className="text-sm text-gray-500">{skill.name_en}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleVisibility(skill)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    >
+                      {skill.is_visible ? (
+                        <Eye className="w-4 h-4 text-gray-500" />
+                      ) : (
+                        <EyeOff className="w-4 h-4 text-gray-400" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => openEditModal(skill)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    >
+                      <Edit className="w-4 h-4 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={() => deleteSkill(skill.id)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
 
-          {skills.length === 0 && (
-            <div className="text-center py-16">
-              <Lightbulb className="h-12 w-12 text-dark-500 mx-auto mb-4" />
-              <p className="text-dark-400">No skills added yet</p>
-            </div>
-          )}
+                {/* Progress Bar */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-gray-500">الإتقان</span>
+                    <span className="font-medium text-gray-900 dark:text-white">{skill.proficiency}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${category.color} transition-all duration-300`}
+                      style={{ width: `${skill.proficiency}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-xs">
+                  <span className={`px-2 py-1 rounded-full ${category.color} bg-opacity-10 text-gray-700 dark:text-gray-300`}>
+                    {category.label}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Skill Form Modal */}
-      <Modal
-        isOpen={showForm}
-        onClose={() => setShowForm(false)}
-        title={editingSkill ? 'Edit Skill' : 'Add Skill'}
-        size="lg"
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Name (English)"
-              value={formData.name_en}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name_en: e.target.value }))
-              }
-              required
-            />
-            <Input
-              label="Name (Arabic)"
-              value={formData.name_ar}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, name_ar: e.target.value }))
-              }
-              dir="rtl"
-              required
-            />
+      {/* Modal */}
+      {isModalOpen && editingSkill && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {editingSkill.id ? 'تعديل مهارة' : 'إضافة مهارة جديدة'}
+                </h2>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Names */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    الاسم (عربي) *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingSkill.name_ar || ''}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, name_ar: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    الاسم (إنجليزي) *
+                  </label>
+                  <input
+                    type="text"
+                    value={editingSkill.name_en || ''}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, name_en: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    الاسم (ألماني)
+                  </label>
+                  <input
+                    type="text"
+                    value={editingSkill.name_de || ''}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, name_de: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700"
+                  />
+                </div>
+              </div>
+
+              {/* Category & Icon */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    الفئة
+                  </label>
+                  <select
+                    value={editingSkill.category || 'programming'}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, category: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700"
+                  >
+                    {Object.entries(categoryConfig).map(([key, config]) => (
+                      <option key={key} value={key}>{config.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    الأيقونة
+                  </label>
+                  <input
+                    type="text"
+                    value={editingSkill.icon || ''}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, icon: e.target.value })}
+                    placeholder="code, database, globe..."
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary-500 dark:bg-gray-700"
+                  />
+                </div>
+              </div>
+
+              {/* Proficiency */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  مستوى الإتقان: {editingSkill.proficiency}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={editingSkill.proficiency || 80}
+                  onChange={(e) => setEditingSkill({ ...editingSkill, proficiency: parseInt(e.target.value) })}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Visibility */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="is_visible"
+                  checked={editingSkill.is_visible ?? true}
+                  onChange={(e) => setEditingSkill({ ...editingSkill, is_visible: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded"
+                />
+                <label htmlFor="is_visible" className="text-sm text-gray-700 dark:text-gray-300">
+                  مرئي للزوار
+                </label>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={saveSkill}
+                disabled={saving || !editingSkill.name_ar || !editingSkill.name_en}
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
+              >
+                {saving ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                حفظ
+              </button>
+            </div>
           </div>
-
-          <Input
-            label="Name (German)"
-            value={formData.name_de}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, name_de: e.target.value }))
-            }
-          />
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              value={formData.category}
-              onChange={(value) =>
-                setFormData((prev) => ({ ...prev, category: value }))
-              }
-              options={categories}
-            />
-            <Select
-              value={formData.icon}
-              onChange={(value) =>
-                setFormData((prev) => ({ ...prev, icon: value }))
-              }
-              options={icons.map((i) => ({ value: i, label: i }))}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-dark-300 mb-2">
-              Proficiency: {formData.proficiency}%
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={formData.proficiency}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  proficiency: parseInt(e.target.value),
-                }))
-              }
-              className="w-full"
-            />
-          </div>
-
-          <Toggle
-            checked={formData.is_visible}
-            onChange={(v) =>
-              setFormData((prev) => ({ ...prev, is_visible: v }))
-            }
-            label="Visible"
-          />
-
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowForm(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" isLoading={isSubmitting}>
-              {editingSkill ? 'Update' : 'Create'}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Delete Confirmation */}
-      <ConfirmModal
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
-        title="Delete Skill"
-        message="Are you sure you want to delete this skill?"
-        confirmText="Delete"
-        variant="danger"
-      />
+        </div>
+      )}
     </div>
   );
 }
