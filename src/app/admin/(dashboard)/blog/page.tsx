@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DataTable, Column, Action } from '@/components/admin/DataTable';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { formatShortDate } from '@/lib/utils/formatDate';
-import type { BlogPost } from '@/types/database';
+import type { BlogPost, BlogPostUpdate } from '@/types/database';
 
 export default function BlogPage() {
   const router = useRouter();
@@ -85,9 +85,13 @@ export default function BlogPage() {
   // Toggle visibility
   const toggleVisibility = async (post: BlogPost) => {
     try {
+      const updateData: BlogPostUpdate = { 
+        is_visible: !post.is_visible 
+      };
+      
       const { error } = await supabase
         .from('blog_posts')
-        .update({ is_visible: !post.is_visible } as any)
+        .update(updateData)
         .eq('id', post.id);
 
       if (error) throw error;
@@ -107,9 +111,13 @@ export default function BlogPage() {
   // Toggle featured
   const toggleFeatured = async (post: BlogPost) => {
     try {
+      const updateData: BlogPostUpdate = { 
+        is_featured: !post.is_featured 
+      };
+      
       const { error } = await supabase
         .from('blog_posts')
-        .update({ is_featured: !post.is_featured } as any)
+        .update(updateData)
         .eq('id', post.id);
 
       if (error) throw error;
@@ -196,7 +204,7 @@ export default function BlogPage() {
       key: 'tags',
       label: 'Tags',
       render: (post: BlogPost) => {
-        const tags = (post.tags as string[]) || [];
+        const tags = post.tags || [];
         return (
           <div className="flex flex-wrap gap-1">
             {tags.slice(0, 2).map((tag) => (
