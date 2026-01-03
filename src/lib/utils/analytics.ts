@@ -1,96 +1,90 @@
-// ============================================
-// Analytics Utilities
-// ============================================
+// src/lib/utils/analytics.ts
 
-import { v4 as uuidv4 } from 'uuid';
-
-const VISITOR_ID_KEY = 'portfolio_visitor_id';
-const SESSION_ID_KEY = 'portfolio_session_id';
-
-// Get or create visitor ID (persistent across sessions)
+// Generate a unique visitor ID
 export function getVisitorId(): string {
   if (typeof window === 'undefined') return '';
   
-  let visitorId = localStorage.getItem(VISITOR_ID_KEY);
+  let visitorId = localStorage.getItem('visitor_id');
   if (!visitorId) {
-    visitorId = uuidv4();
-    localStorage.setItem(VISITOR_ID_KEY, visitorId);
+    visitorId = generateUUID();
+    localStorage.setItem('visitor_id', visitorId);
   }
   return visitorId;
 }
 
-// Get or create session ID (cleared when browser closes)
+// Generate a session ID
 export function getSessionId(): string {
   if (typeof window === 'undefined') return '';
   
-  let sessionId = sessionStorage.getItem(SESSION_ID_KEY);
+  let sessionId = sessionStorage.getItem('session_id');
   if (!sessionId) {
-    sessionId = uuidv4();
-    sessionStorage.setItem(SESSION_ID_KEY, sessionId);
+    sessionId = generateUUID();
+    sessionStorage.setItem('session_id', sessionId);
   }
   return sessionId;
 }
 
-// Detect device type
-export function getDeviceType(): 'mobile' | 'tablet' | 'desktop' {
-  if (typeof window === 'undefined') return 'desktop';
-  
-  const width = window.innerWidth;
-  if (width < 768) return 'mobile';
-  if (width < 1024) return 'tablet';
-  return 'desktop';
-}
-
-// Get browser name
-export function getBrowser(): string {
-  if (typeof navigator === 'undefined') return 'unknown';
-  
-  const ua = navigator.userAgent;
-  if (ua.includes('Firefox')) return 'Firefox';
-  if (ua.includes('Chrome')) return 'Chrome';
-  if (ua.includes('Safari')) return 'Safari';
-  if (ua.includes('Edge')) return 'Edge';
-  if (ua.includes('Opera')) return 'Opera';
-  return 'Other';
-}
-
-// Get OS
-export function getOS(): string {
-  if (typeof navigator === 'undefined') return 'unknown';
-  
-  const ua = navigator.userAgent;
-  if (ua.includes('Windows')) return 'Windows';
-  if (ua.includes('Mac')) return 'macOS';
-  if (ua.includes('Linux')) return 'Linux';
-  if (ua.includes('Android')) return 'Android';
-  if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) return 'iOS';
-  return 'Other';
+// Simple UUID generator
+function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 // Track page view
-export async function trackPageView(pagePath: string): Promise<void> {
+export async function trackPageView(pagePath?: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
   try {
     const visitorId = getVisitorId();
     const sessionId = getSessionId();
     
-    if (!visitorId) return;
-
     await fetch('/api/analytics', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
         visitorId,
         sessionId,
         eventType: 'pageview',
-        pagePath,
-        referrer: document.referrer || null,
-        deviceType: getDeviceType(),
-        browser: getBrowser(),
-        os: getOS(),
+        pagePath: pagePath || window.location.pathname,
+        referrer: document.referrer,
       }),
     });
   } catch (error) {
     // Silently fail - analytics shouldn't break the app
+    console.error('Analytics error:', error);
+  }
+}
+
+// Track custom event
+export async function trackEvent(
+  eventType: string,
+  metadata?: Record<string, unknown>
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const visitorId = getVisitorId();
+    const sessionId = getSessionId();
+    
+    await fetch('/api/analytics', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        visitorId,
+        sessionId,
+        eventType,
+        pagePath: window.location.pathname,
+        metadata,
+      }),
+    });
+  } catch (error) {
     console.error('Analytics error:', error);
   }
 }
