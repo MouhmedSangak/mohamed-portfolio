@@ -187,6 +187,7 @@ export interface Database {
       // ============================================
       // SKILLS TABLE
       // ============================================
+
       skills: {
         Row: {
           id: string
@@ -672,7 +673,7 @@ export type UpdateTables<T extends keyof Database['public']['Tables']> =
 export type Admin = Tables<'admins'>
 export type Profile = Tables<'profile'>
 export type SocialLink = Tables<'social_links'>
-export type Skill = Tables<'skills'>
+export type Skill = Database['public']['Tables']['skills']['Row']
 export type Project = Tables<'projects'>
 export type BlogPost = Tables<'blog_posts'>
 export type ContactMessage = Tables<'contact_messages'>
