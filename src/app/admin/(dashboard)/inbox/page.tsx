@@ -74,20 +74,17 @@ export default function InboxPage() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Update message status - Fixed version
+  // Update message status - Fixed with type assertion
   const updateMessageStatus = async (id: string, newStatus: MessageStatus) => {
     try {
-      const updates: Record<string, unknown> = {
+      const updates = {
         status: newStatus,
+        ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}),
       };
-      
-      if (newStatus === 'replied') {
-        updates.replied_at = new Date().toISOString();
-      }
 
       const { error } = await supabase
         .from('contact_messages')
-        .update(updates)
+        .update(updates as any)
         .eq('id', id);
 
       if (error) throw error;
@@ -95,7 +92,9 @@ export default function InboxPage() {
       // Update local state
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === id ? { ...msg, status: newStatus, ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}) } : msg
+          msg.id === id 
+            ? { ...msg, status: newStatus, ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}) } 
+            : msg
         )
       );
 
