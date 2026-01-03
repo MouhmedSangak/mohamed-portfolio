@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@/lib/supabase/client';
 import { Database, ContactMessage, MessageStatus } from '@/lib/supabase/types';
 import { 
   Mail, 
@@ -15,16 +15,13 @@ import {
   Clock,
   MessageSquare,
   AlertCircle,
-  Eye,
   Reply,
-  MoreVertical,
   Phone,
-  ExternalLink,
   Download,
   X
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ar, enUS, de } from 'date-fns/locale';
+import { ar } from 'date-fns/locale';
 
 // Status configuration
 const statusConfig: Record<MessageStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -43,7 +40,7 @@ export default function InboxPage() {
   const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClient();
 
   // Fetch messages
   const fetchMessages = useCallback(async () => {
@@ -77,7 +74,7 @@ export default function InboxPage() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Update message status ⭐ هذه الدالة المعدلة
+  // Update message status
   const updateMessageStatus = async (id: string, status: MessageStatus) => {
     try {
       const updateData: Database['public']['Tables']['contact_messages']['Update'] = {
@@ -92,7 +89,6 @@ export default function InboxPage() {
 
       if (error) throw error;
 
-      // Update local state
       setMessages(prev =>
         prev.map(msg =>
           msg.id === id ? { ...msg, ...updateData } : msg
