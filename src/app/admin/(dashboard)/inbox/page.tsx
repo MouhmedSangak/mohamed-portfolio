@@ -1,135 +1,89 @@
-// ============================================
-// Admin Inbox Page
-// ============================================
-
+// src/app/admin/(dashboard)/inbox/page.tsx
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import {
-  Inbox,
+import { useState, useEffect, useCallback } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database, ContactMessage, MessageStatus } from '@/lib/supabase/types';
+import { 
+  Mail, 
+  Archive, 
+  Trash2, 
   Search,
+  Filter,
   RefreshCw,
-  Trash2,
-  Archive,
-  Check,
-  Mail,
+  CheckCircle,
+  Clock,
+  MessageSquare,
+  AlertCircle,
+  Eye,
+  Reply,
+  MoreVertical,
+  Phone,
+  ExternalLink,
+  Download,
+  X
 } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import { useToastActions } from '@/components/ui/Toast';
-import { Button } from '@/components/ui/Button';
-import { ConfirmModal } from '@/components/ui/Modal';
-import { InboxItem } from '@/components/admin/InboxItem';
-import { cn } from '@/lib/utils/cn';
-import type { ContactMessage } from '@/types/database';
+import { formatDistanceToNow } from 'date-fns';
+import { ar, enUS, de } from 'date-fns/locale';
 
-// Computed status based on message fields
-type MessageStatus = 'new' | 'read' | 'replied' | 'archived';
-type FilterStatus = 'all' | MessageStatus;
-
-// Helper function to compute status from message
-const getMessageStatus = (message: ContactMessage): MessageStatus => {
-  if (message.is_archived) return 'archived';
-  if (message.replied_at) return 'replied';
-  if (message.is_read) return 'read';
-  return 'new';
+// Status configuration
+const statusConfig: Record<MessageStatus, { label: string; color: string; icon: React.ElementType }> = {
+  new: { label: 'جديد', color: 'bg-blue-500', icon: Mail },
+  in_progress: { label: 'قيد المتابعة', color: 'bg-yellow-500', icon: Clock },
+  replied: { label: 'تم الرد', color: 'bg-green-500', icon: CheckCircle },
+  archived: { label: 'مؤرشف', color: 'bg-gray-500', icon: Archive },
+  spam: { label: 'بريد مزعج', color: 'bg-red-500', icon: AlertCircle },
 };
 
-const filterTabs: { key: FilterStatus; label: string; icon?: React.ReactNode }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'new', label: 'New', icon: <span className="w-2 h-2 rounded-full bg-blue-500" /> },
-  { key: 'read', label: 'Read' },
-  { key: 'replied', label: 'Replied' },
-  { key: 'archived', label: 'Archived' },
-];
-
 export default function InboxPage() {
-  const supabase = getSupabaseClient();
-  const toast = useToastActions();
-  
   const [messages, setMessages] = useState<ContactMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
   const [selectedMessage, setSelectedMessage] = useState<ContactMessage | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const supabase = createClientComponentClient<Database>();
 
   // Fetch messages
   const fetchMessages = useCallback(async () => {
-    setIsLoading(true);
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('contact_messages')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,subject.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      setMessages((data as ContactMessage[]) || []);
+      setMessages(data || []);
     } catch (error) {
-      console.error('Fetch error:', error);
-      toast.error('Failed to load messages');
+      console.error('Error fetching messages:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [supabase, toast]);
+  }, [supabase, statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Filter messages by status and search
-  const filteredMessages = messages.filter((m) => {
-    // Filter by status
-    if (filterStatus !== 'all') {
-      const status = getMessageStatus(m);
-      if (status !== filterStatus) return false;
-    }
-    
-    // Filter by search
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        m.name.toLowerCase().includes(query) ||
-        m.email.toLowerCase().includes(query) ||
-        (m.subject?.toLowerCase() || '').includes(query)
-      );
-    }
-    
-    return true;
-  });
-
-  // Count by status
-  const statusCounts = messages.reduce((acc, m) => {
-    const status = getMessageStatus(m);
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Handle status change
-  const handleStatusChange = async (id: string, newStatus: MessageStatus) => {
+  // Update message status ⭐ هذه الدالة المعدلة
+  const updateMessageStatus = async (id: string, status: MessageStatus) => {
     try {
-      const updateData: Partial<ContactMessage> = {};
-      
-      switch (newStatus) {
-        case 'new':
-          updateData.is_read = false;
-          updateData.is_archived = false;
-          updateData.replied_at = null;
-          break;
-        case 'read':
-          updateData.is_read = true;
-          updateData.is_archived = false;
-          break;
-        case 'replied':
-          updateData.is_read = true;
-          updateData.replied_at = new Date().toISOString();
-          updateData.is_archived = false;
-          break;
-        case 'archived':
-          updateData.is_archived = true;
-          break;
-      }
+      const updateData: Database['public']['Tables']['contact_messages']['Update'] = {
+        status,
+        ...(status === 'replied' ? { replied_at: new Date().toISOString() } : {})
+      };
 
       const { error } = await supabase
         .from('contact_messages')
@@ -138,18 +92,25 @@ export default function InboxPage() {
 
       if (error) throw error;
 
-      setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, ...updateData } : m))
+      // Update local state
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === id ? { ...msg, ...updateData } : msg
+        )
       );
-      toast.success('Status updated');
+
+      if (selectedMessage?.id === id) {
+        setSelectedMessage(prev => prev ? { ...prev, ...updateData } : null);
+      }
     } catch (error) {
-      console.error('Update error:', error);
-      toast.error('Failed to update status');
+      console.error('Error updating message:', error);
     }
   };
 
-  // Handle delete
-  const handleDelete = async (id: string) => {
+  // Delete message
+  const deleteMessage = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
+
     try {
       const { error } = await supabase
         .from('contact_messages')
@@ -158,276 +119,294 @@ export default function InboxPage() {
 
       if (error) throw error;
 
-      setMessages((prev) => prev.filter((m) => m.id !== id));
-      setDeleteConfirm(null);
-      toast.success('Message deleted');
+      setMessages(prev => prev.filter(msg => msg.id !== id));
+      if (selectedMessage?.id === id) {
+        setSelectedMessage(null);
+      }
     } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete message');
+      console.error('Error deleting message:', error);
     }
   };
 
-  // Handle bulk actions
-  const handleBulkAction = async (action: 'archive' | 'delete' | 'mark_read') => {
-    const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
+  // Get counts by status
+  const getCounts = () => {
+    const counts: Record<MessageStatus | 'all', number> = {
+      all: messages.length,
+      new: 0,
+      in_progress: 0,
+      replied: 0,
+      archived: 0,
+      spam: 0,
+    };
 
-    try {
-      if (action === 'delete') {
-        const { error } = await supabase
-          .from('contact_messages')
-          .delete()
-          .in('id', ids);
-        
-        if (error) throw error;
-        setMessages((prev) => prev.filter((m) => !ids.includes(m.id)));
-      } else if (action === 'archive') {
-        const { error } = await supabase
-          .from('contact_messages')
-          .update({ is_archived: true })
-          .in('id', ids);
-        
-        if (error) throw error;
-        setMessages((prev) =>
-          prev.map((m) => (ids.includes(m.id) ? { ...m, is_archived: true } : m))
-        );
-      } else if (action === 'mark_read') {
-        const { error } = await supabase
-          .from('contact_messages')
-          .update({ is_read: true })
-          .in('id', ids);
-        
-        if (error) throw error;
-        setMessages((prev) =>
-          prev.map((m) => (ids.includes(m.id) ? { ...m, is_read: true } : m))
-        );
-      }
-
-      setSelectedIds(new Set());
-      toast.success(`${ids.length} messages updated`);
-    } catch (error) {
-      console.error('Bulk action error:', error);
-      toast.error('Failed to perform action');
-    }
-  };
-
-  // Toggle selection
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
-      return newSet;
+    messages.forEach(msg => {
+      counts[msg.status]++;
     });
+
+    return counts;
   };
+
+  const counts = getCounts();
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Inbox</h1>
-          <p className="text-dark-400">
-            Manage contact form submissions
-          </p>
-        </div>
-        <Button
-          variant="secondary"
-          onClick={fetchMessages}
-          leftIcon={<RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />}
-        >
-          Refresh
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by name, email, or subject..."
-            className="w-full pl-10 pr-4 py-2.5 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder:text-dark-400 focus:border-primary-500 focus:outline-none transition-colors"
-          />
-        </div>
-
-        {/* Status Tabs */}
-        <div className="flex items-center gap-1 p-1 bg-dark-800 rounded-lg overflow-x-auto">
-          {filterTabs.map((tab) => (
+    <div className="h-[calc(100vh-4rem)] flex">
+      {/* Sidebar - Messages List */}
+      <div className="w-96 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              صندوق الوارد
+            </h1>
             <button
-              key={tab.key}
-              onClick={() => setFilterStatus(tab.key)}
-              className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors',
-                filterStatus === tab.key
-                  ? 'bg-primary-500 text-white'
-                  : 'text-dark-300 hover:text-white hover:bg-dark-700'
-              )}
+              onClick={fetchMessages}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
-              {tab.icon}
-              {tab.label}
-              {tab.key !== 'all' && statusCounts[tab.key] > 0 && (
-                <span className="px-1.5 py-0.5 text-xs rounded-full bg-dark-600">
-                  {statusCounts[tab.key]}
-                </span>
-              )}
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="بحث في الرسائل..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pr-10 pl-4 py-2 bg-gray-100 dark:bg-gray-800 border-0 rounded-lg focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          {/* Filter Toggle */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600"
+          >
+            <Filter className="w-4 h-4" />
+            فلترة حسب الحالة
+          </button>
+
+          {/* Filters */}
+          {showFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                  statusFilter === 'all'
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                }`}
+              >
+                الكل ({counts.all})
+              </button>
+              {(Object.keys(statusConfig) as MessageStatus[]).map((status) => {
+                const config = statusConfig[status];
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                      statusFilter === status
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {config.label} ({counts[status]})
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Messages List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+              <Mail className="w-8 h-8 mb-2" />
+              <p>لا توجد رسائل</p>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <div
+                key={message.id}
+                onClick={() => setSelectedMessage(message)}
+                className={`p-4 border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-colors ${
+                  selectedMessage?.id === message.id
+                    ? 'bg-primary-50 dark:bg-primary-900/20'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                } ${message.status === 'new' ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${statusConfig[message.status].color}`} />
+                    <span className="font-medium text-gray-900 dark:text-white truncate max-w-[150px]">
+                      {message.name}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-500">
+                    {formatDistanceToNow(new Date(message.created_at), {
+                      addSuffix: true,
+                      locale: ar,
+                    })}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">
+                  {message.subject}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {message.message.substring(0, 80)}...
+                </p>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      {/* Bulk Actions */}
-      {selectedIds.size > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-4 p-4 bg-primary-500/10 border border-primary-500/30 rounded-lg"
-        >
-          <span className="text-sm text-primary-400">
-            {selectedIds.size} selected
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleBulkAction('mark_read')}
-              leftIcon={<Check className="h-4 w-4" />}
-            >
-              Mark Read
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleBulkAction('archive')}
-              leftIcon={<Archive className="h-4 w-4" />}
-            >
-              Archive
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              onClick={() => handleBulkAction('delete')}
-              leftIcon={<Trash2 className="h-4 w-4" />}
-            >
-              Delete
-            </Button>
-          </div>
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            className="ml-auto text-sm text-dark-400 hover:text-white"
-          >
-            Clear selection
-          </button>
-        </motion.div>
-      )}
-
-      {/* Messages List */}
-      <div className="bg-dark-900 rounded-xl border border-dark-700 overflow-hidden">
-        {isLoading ? (
-          <div className="divide-y divide-dark-700">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="p-4 animate-pulse">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-dark-700" />
-                  <div className="flex-1">
-                    <div className="h-4 bg-dark-700 rounded w-1/4 mb-2" />
-                    <div className="h-3 bg-dark-700 rounded w-1/2 mb-2" />
-                    <div className="h-3 bg-dark-700 rounded w-3/4" />
+      {/* Message Detail */}
+      <div className="flex-1 bg-gray-50 dark:bg-gray-800">
+        {selectedMessage ? (
+          <div className="h-full flex flex-col">
+            {/* Message Header */}
+            <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                    {selectedMessage.subject}
+                  </h2>
+                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-4 h-4" />
+                      {selectedMessage.email}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-4 h-4" />
+                      {selectedMessage.whatsapp}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs text-white ${statusConfig[selectedMessage.status].color}`}>
+                      {statusConfig[selectedMessage.status].label}
+                    </span>
                   </div>
                 </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMessage.status}
+                    onChange={(e) => updateMessageStatus(selectedMessage.id, e.target.value as MessageStatus)}
+                    className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800"
+                  >
+                    {(Object.keys(statusConfig) as MessageStatus[]).map((status) => (
+                      <option key={status} value={status}>
+                        {statusConfig[status].label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => deleteMessage(selectedMessage.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedMessage(null)}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        ) : filteredMessages.length > 0 ? (
-          <div className="divide-y divide-dark-700">
-            {filteredMessages.map((message) => (
-              <InboxItem
-                key={message.id}
-                message={message}
-                status={getMessageStatus(message)}
-                isSelected={selectedIds.has(message.id)}
-                onSelect={toggleSelect}
-                onStatusChange={handleStatusChange}
-                onDelete={(id) => setDeleteConfirm(id)}
-                onView={setSelectedMessage}
-              />
-            ))}
+            </div>
+
+            {/* Message Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
+                    <span className="text-xl font-bold text-primary-600">
+                      {selectedMessage.name.charAt(0)}
+                    </span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {selectedMessage.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {new Date(selectedMessage.created_at).toLocaleString('ar-EG')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="prose dark:prose-invert max-w-none">
+                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed">
+                    {selectedMessage.message}
+                  </p>
+                </div>
+
+                {/* Attachment */}
+                {selectedMessage.attachment_url && (
+                  <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      مرفقات
+                    </h4>
+                    <a
+                      href={selectedMessage.attachment_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{selectedMessage.attachment_name || 'تحميل المرفق'}</span>
+                    </a>
+                  </div>
+                )}
+
+                {/* Contact Preference */}
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-sm text-gray-500">
+                    طريقة التواصل المفضلة:{' '}
+                    <span className="font-medium text-gray-700 dark:text-gray-300">
+                      {selectedMessage.preferred_contact === 'email' ? 'البريد الإلكتروني' : 'واتساب'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick Reply Buttons */}
+              <div className="mt-6 flex gap-3">
+                <a
+                  href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
+                >
+                  <Reply className="w-5 h-5" />
+                  الرد عبر البريد
+                </a>
+                <a
+                  href={`https://wa.me/${selectedMessage.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+                >
+                  <MessageSquare className="w-5 h-5" />
+                  الرد عبر واتساب
+                </a>
+              </div>
+            </div>
           </div>
         ) : (
-          <div className="py-16 text-center">
-            <Mail className="h-12 w-12 text-dark-500 mx-auto mb-4" />
-            <p className="text-dark-400">
-              {searchQuery
-                ? 'No messages match your search'
-                : 'No messages in this folder'}
-            </p>
+          <div className="h-full flex flex-col items-center justify-center text-gray-500">
+            <Mail className="w-16 h-16 mb-4 opacity-50" />
+            <p className="text-lg">اختر رسالة للعرض</p>
           </div>
         )}
       </div>
-
-      {/* Message Detail Modal */}
-      {selectedMessage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="w-full max-w-2xl bg-dark-900 rounded-xl border border-dark-700 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-white">{selectedMessage.name}</h2>
-                <p className="text-dark-400">{selectedMessage.email}</p>
-              </div>
-              <button
-                onClick={() => setSelectedMessage(null)}
-                className="text-dark-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            {selectedMessage.subject && (
-              <h3 className="text-lg font-medium text-white mb-2">
-                {selectedMessage.subject}
-              </h3>
-            )}
-            <p className="text-dark-300 whitespace-pre-wrap">
-              {selectedMessage.message}
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  handleStatusChange(selectedMessage.id, 'replied');
-                  setSelectedMessage(null);
-                }}
-              >
-                Mark as Replied
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  window.location.href = `mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject || 'Your message'}`;
-                }}
-              >
-                Reply via Email
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation */}
-      <ConfirmModal
-        isOpen={!!deleteConfirm}
-        onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => deleteConfirm && handleDelete(deleteConfirm)}
-        title="Delete Message"
-        message="Are you sure you want to delete this message? This action cannot be undone."
-        confirmText="Delete"
-        variant="danger"
-      />
     </div>
   );
 }
