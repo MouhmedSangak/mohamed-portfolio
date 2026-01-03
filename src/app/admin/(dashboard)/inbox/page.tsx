@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Database, ContactMessage, MessageStatus } from '@/lib/supabase/types';
+import { ContactMessage, MessageStatus } from '@/lib/supabase/types';
 import { 
   Mail, 
   Archive, 
@@ -62,7 +62,7 @@ export default function InboxPage() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setMessages(data || []);
+      setMessages((data as ContactMessage[]) || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
     } finally {
@@ -74,29 +74,33 @@ export default function InboxPage() {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Update message status
-  const updateMessageStatus = async (id: string, status: MessageStatus) => {
+  // Update message status - Fixed version
+  const updateMessageStatus = async (id: string, newStatus: MessageStatus) => {
     try {
-      const updateData: Database['public']['Tables']['contact_messages']['Update'] = {
-        status,
-        ...(status === 'replied' ? { replied_at: new Date().toISOString() } : {})
+      const updates: Record<string, unknown> = {
+        status: newStatus,
       };
+      
+      if (newStatus === 'replied') {
+        updates.replied_at = new Date().toISOString();
+      }
 
       const { error } = await supabase
         .from('contact_messages')
-        .update(updateData)
+        .update(updates)
         .eq('id', id);
 
       if (error) throw error;
 
+      // Update local state
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === id ? { ...msg, ...updateData } : msg
+          msg.id === id ? { ...msg, status: newStatus, ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}) } : msg
         )
       );
 
       if (selectedMessage?.id === id) {
-        setSelectedMessage(prev => prev ? { ...prev, ...updateData } : null);
+        setSelectedMessage(prev => prev ? { ...prev, status: newStatus } : null);
       }
     } catch (error) {
       console.error('Error updating message:', error);
