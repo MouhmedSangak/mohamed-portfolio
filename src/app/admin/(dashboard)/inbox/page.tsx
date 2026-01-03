@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient, createUntypedClient } from '@/lib/supabase/client';
 import { ContactMessage, MessageStatus } from '@/lib/supabase/types';
 import { 
   Mail, 
@@ -23,7 +23,6 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
-// Status configuration
 const statusConfig: Record<MessageStatus, { label: string; color: string; icon: React.ElementType }> = {
   new: { label: 'جديد', color: 'bg-blue-500', icon: Mail },
   in_progress: { label: 'قيد المتابعة', color: 'bg-yellow-500', icon: Clock },
@@ -40,11 +39,12 @@ export default function InboxPage() {
   const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Fetch messages
+  const supabase = createClient();
+  const untypedSupabase = createUntypedClient();
+
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const supabase = createClient();
       let query = supabase
         .from('contact_messages')
         .select('*')
@@ -59,7 +59,6 @@ export default function InboxPage() {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
       setMessages((data as ContactMessage[]) || []);
     } catch (error) {
@@ -67,19 +66,15 @@ export default function InboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [supabase, statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Update message status - Using raw client
   const updateMessageStatus = async (id: string, newStatus: MessageStatus) => {
     try {
-      const supabase = createClient();
-      
-      // Use raw query to bypass TypeScript strict checking
-      const { error } = await (supabase as any)
+      const { error } = await untypedSupabase
         .from('contact_messages')
         .update({ 
           status: newStatus,
@@ -89,12 +84,9 @@ export default function InboxPage() {
 
       if (error) throw error;
 
-      // Update local state
       setMessages(prev =>
         prev.map(msg =>
-          msg.id === id 
-            ? { ...msg, status: newStatus, ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}) } 
-            : msg
+          msg.id === id ? { ...msg, status: newStatus } : msg
         )
       );
 
@@ -106,12 +98,10 @@ export default function InboxPage() {
     }
   };
 
-  // Delete message
   const deleteMessage = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
 
     try {
-      const supabase = createClient();
       const { error } = await supabase
         .from('contact_messages')
         .delete()
@@ -128,7 +118,6 @@ export default function InboxPage() {
     }
   };
 
-  // Get counts by status
   const getCounts = () => {
     const counts: Record<MessageStatus | 'all', number> = {
       all: messages.length,
@@ -138,11 +127,7 @@ export default function InboxPage() {
       archived: 0,
       spam: 0,
     };
-
-    messages.forEach(msg => {
-      counts[msg.status]++;
-    });
-
+    messages.forEach(msg => { counts[msg.status]++; });
     return counts;
   };
 
@@ -150,23 +135,15 @@ export default function InboxPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex">
-      {/* Sidebar - Messages List */}
       <div className="w-96 border-l border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-900">
-        {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              صندوق الوارد
-            </h1>
-            <button
-              onClick={fetchMessages}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">صندوق الوارد</h1>
+            <button onClick={fetchMessages} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          {/* Search */}
           <div className="relative">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -178,7 +155,6 @@ export default function InboxPage() {
             />
           </div>
 
-          {/* Filter Toggle */}
           <button
             onClick={() => setShowFilters(!showFilters)}
             className="mt-3 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600"
@@ -187,40 +163,27 @@ export default function InboxPage() {
             فلترة حسب الحالة
           </button>
 
-          {/* Filters */}
           {showFilters && (
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                  statusFilter === 'all'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                }`}
+                className={`px-3 py-1 text-xs rounded-full ${statusFilter === 'all' ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
               >
                 الكل ({counts.all})
               </button>
-              {(Object.keys(statusConfig) as MessageStatus[]).map((status) => {
-                const config = statusConfig[status];
-                return (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      statusFilter === status
-                        ? 'bg-primary-600 text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}
-                  >
-                    {config.label} ({counts[status]})
-                  </button>
-                );
-              })}
+              {(Object.keys(statusConfig) as MessageStatus[]).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`px-3 py-1 text-xs rounded-full ${statusFilter === status ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-800'}`}
+                >
+                  {statusConfig[status].label} ({counts[status]})
+                </button>
+              ))}
             </div>
           )}
         </div>
 
-        {/* Messages List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
@@ -237,64 +200,41 @@ export default function InboxPage() {
                 key={message.id}
                 onClick={() => setSelectedMessage(message)}
                 className={`p-4 border-b border-gray-100 dark:border-gray-800 cursor-pointer transition-colors ${
-                  selectedMessage?.id === message.id
-                    ? 'bg-primary-50 dark:bg-primary-900/20'
-                    : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  selectedMessage?.id === message.id ? 'bg-primary-50 dark:bg-primary-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                 } ${message.status === 'new' ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${statusConfig[message.status].color}`} />
-                    <span className="font-medium text-gray-900 dark:text-white truncate max-w-[150px]">
-                      {message.name}
-                    </span>
+                    <span className="font-medium text-gray-900 dark:text-white truncate max-w-[150px]">{message.name}</span>
                   </div>
                   <span className="text-xs text-gray-500">
-                    {formatDistanceToNow(new Date(message.created_at), {
-                      addSuffix: true,
-                      locale: ar,
-                    })}
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true, locale: ar })}
                   </span>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">
-                  {message.subject}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {message.message.substring(0, 80)}...
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 truncate mb-1">{message.subject}</p>
+                <p className="text-xs text-gray-500 truncate">{message.message.substring(0, 80)}...</p>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* Message Detail */}
       <div className="flex-1 bg-gray-50 dark:bg-gray-800">
         {selectedMessage ? (
           <div className="h-full flex flex-col">
-            {/* Message Header */}
             <div className="p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-                    {selectedMessage.subject}
-                  </h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{selectedMessage.subject}</h2>
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-4 h-4" />
-                      {selectedMessage.email}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
-                      {selectedMessage.whatsapp}
-                    </span>
+                    <span className="flex items-center gap-1"><Mail className="w-4 h-4" />{selectedMessage.email}</span>
+                    <span className="flex items-center gap-1"><Phone className="w-4 h-4" />{selectedMessage.whatsapp}</span>
                     <span className={`px-2 py-0.5 rounded-full text-xs text-white ${statusConfig[selectedMessage.status].color}`}>
                       {statusConfig[selectedMessage.status].label}
                     </span>
                   </div>
                 </div>
-
-                {/* Actions */}
                 <div className="flex items-center gap-2">
                   <select
                     value={selectedMessage.status}
@@ -302,100 +242,58 @@ export default function InboxPage() {
                     className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5 bg-white dark:bg-gray-800"
                   >
                     {(Object.keys(statusConfig) as MessageStatus[]).map((status) => (
-                      <option key={status} value={status}>
-                        {statusConfig[status].label}
-                      </option>
+                      <option key={status} value={status}>{statusConfig[status].label}</option>
                     ))}
                   </select>
-
-                  <button
-                    onClick={() => deleteMessage(selectedMessage.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => deleteMessage(selectedMessage.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
                     <Trash2 className="w-5 h-5" />
                   </button>
-
-                  <button
-                    onClick={() => setSelectedMessage(null)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => setSelectedMessage(null)} className="p-2 hover:bg-gray-100 rounded-lg">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Message Body */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-sm">
                 <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
                   <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900 rounded-full flex items-center justify-center">
-                    <span className="text-xl font-bold text-primary-600">
-                      {selectedMessage.name.charAt(0)}
-                    </span>
+                    <span className="text-xl font-bold text-primary-600">{selectedMessage.name.charAt(0)}</span>
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
-                      {selectedMessage.name}
-                    </h3>
-                    <p className="text-sm text-gray-500">
-                      {new Date(selectedMessage.created_at).toLocaleString('ar-EG')}
-                    </p>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">{selectedMessage.name}</h3>
+                    <p className="text-sm text-gray-500">{new Date(selectedMessage.created_at).toLocaleString('ar-EG')}</p>
                   </div>
                 </div>
+                <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed">{selectedMessage.message}</p>
 
-                <div className="prose dark:prose-invert max-w-none">
-                  <p className="whitespace-pre-wrap text-gray-700 dark:text-gray-300 leading-relaxed">
-                    {selectedMessage.message}
-                  </p>
-                </div>
-
-                {/* Attachment */}
                 {selectedMessage.attachment_url && (
                   <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                      مرفقات
-                    </h4>
-                    <a
-                      href={selectedMessage.attachment_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                    >
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">مرفقات</h4>
+                    <a href={selectedMessage.attachment_url} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200">
                       <Download className="w-4 h-4" />
                       <span>{selectedMessage.attachment_name || 'تحميل المرفق'}</span>
                     </a>
                   </div>
                 )}
 
-                {/* Contact Preference */}
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                   <p className="text-sm text-gray-500">
-                    طريقة التواصل المفضلة:{' '}
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      {selectedMessage.preferred_contact === 'email' ? 'البريد الإلكتروني' : 'واتساب'}
-                    </span>
+                    طريقة التواصل المفضلة: <span className="font-medium">{selectedMessage.preferred_contact === 'email' ? 'البريد الإلكتروني' : 'واتساب'}</span>
                   </p>
                 </div>
               </div>
 
-              {/* Quick Reply Buttons */}
               <div className="mt-6 flex gap-3">
-                <a
-                  href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors"
-                >
-                  <Reply className="w-5 h-5" />
-                  الرد عبر البريد
+                <a href={`mailto:${selectedMessage.email}?subject=Re: ${selectedMessage.subject}`}
+                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700">
+                  <Reply className="w-5 h-5" />الرد عبر البريد
                 </a>
-                <a
-                  href={`https://wa.me/${selectedMessage.whatsapp.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
-                >
-                  <MessageSquare className="w-5 h-5" />
-                  الرد عبر واتساب
+                <a href={`https://wa.me/${selectedMessage.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
+                   className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700">
+                  <MessageSquare className="w-5 h-5" />الرد عبر واتساب
                 </a>
               </div>
             </div>
