@@ -13,8 +13,6 @@ import {
   FolderOpen, 
   BookOpen,
   TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   Clock
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase/client';
@@ -43,11 +41,9 @@ interface RecentMessage {
   created_at: string;
 }
 
-interface RecentActivity {
-  id: string;
-  type: string;
-  title: string;
-  created_at: string;
+// Type for analytics query result
+interface VisitorRecord {
+  visitor_id: string;
 }
 
 export default function DashboardPage() {
@@ -71,18 +67,18 @@ export default function DashboardPage() {
         const { data: allVisitors } = await supabase
           .from('analytics_events')
           .select('visitor_id')
-          .eq('event_type', 'pageview');
+          .eq('event_type', 'pageview') as { data: VisitorRecord[] | null };
         
-        const uniqueVisitors = new Set(allVisitors?.map(v => v.visitor_id)).size;
+        const uniqueVisitors = new Set(allVisitors?.map(v => v.visitor_id) || []).size;
 
         // Today's visitors
         const { data: todayVisitors } = await supabase
           .from('analytics_events')
           .select('visitor_id')
           .eq('event_type', 'pageview')
-          .gte('created_at', today.toISOString());
+          .gte('created_at', today.toISOString()) as { data: VisitorRecord[] | null };
         
-        const todayUniqueVisitors = new Set(todayVisitors?.map(v => v.visitor_id)).size;
+        const todayUniqueVisitors = new Set(todayVisitors?.map(v => v.visitor_id) || []).size;
 
         // Yesterday's visitors for comparison
         const { data: yesterdayVisitors } = await supabase
@@ -90,9 +86,9 @@ export default function DashboardPage() {
           .select('visitor_id')
           .eq('event_type', 'pageview')
           .gte('created_at', yesterday.toISOString())
-          .lt('created_at', today.toISOString());
+          .lt('created_at', today.toISOString()) as { data: VisitorRecord[] | null };
         
-        const yesterdayUniqueVisitors = new Set(yesterdayVisitors?.map(v => v.visitor_id)).size;
+        const yesterdayUniqueVisitors = new Set(yesterdayVisitors?.map(v => v.visitor_id) || []).size;
 
         // Total pageviews
         const { count: pageviews } = await supabase
@@ -138,7 +134,7 @@ export default function DashboardPage() {
           .from('contact_messages')
           .select('id, name, email, subject, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(5) as { data: RecentMessage[] | null };
 
         setRecentMessages(messages || []);
 
@@ -200,7 +196,7 @@ export default function DashboardPage() {
       replied: 'success',
       spam: 'danger',
     };
-    return variants[status] || 'secondary';
+    return variants[status] || 'info';
   };
 
   return (
