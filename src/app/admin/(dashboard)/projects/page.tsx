@@ -1,300 +1,349 @@
-// ============================================
-// Admin Projects List Page
-// ============================================
-
+// src/app/admin/(dashboard)/projects/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import Link from 'next/link';
+import Image from 'next/image';
+import { createClient, createUntypedClient } from '@/lib/supabase/client';
+import { Project } from '@/lib/supabase/types';
 import {
   Plus,
-  FolderOpen,
-  Eye,
-  EyeOff,
+  Search,
+  Filter,
   Edit,
   Trash2,
+  Eye,
+  EyeOff,
   Star,
-  Lock,
+  StarOff,
   ExternalLink,
+  Github,
+  MoreVertical,
+  RefreshCw,
+  GripVertical,
 } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase/client';
-import { useToastActions } from '@/components/ui/Toast';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { DataTable, Column, Action } from '@/components/admin/DataTable';
-import { ConfirmModal } from '@/components/ui/Modal';
-import type { Project } from '@/types/database';
+import { formatDistanceToNow } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 export default function ProjectsPage() {
-  const router = useRouter();
-  const supabase = getSupabaseClient();
-  const toast = useToastActions();
-
   const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft' | 'archived'>('all');
+  const router = useRouter();
+
+  const supabase = createClient();
+  const untypedSupabase = createUntypedClient();
 
   // Fetch projects
-  useEffect(() => {
-    const fetchProjects = async () => {
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select('*')
-          .order('display_order');
-
-        if (error) throw error;
-        setProjects(data || []);
-      } catch (error) {
-        console.error('Fetch error:', error);
-        toast.error('Failed to load projects');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProjects();
-  }, [supabase, toast]);
-
-  // Delete project
-  const handleDelete = async () => {
-    if (!deleteId) return;
-
-    setIsDeleting(true);
+  const fetchProjects = useCallback(async () => {
+    setLoading(true);
     try {
-      const { error } = await supabase
+      let query = supabase
         .from('projects')
-        .delete()
-        .eq('id', deleteId);
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (searchQuery) {
+        query = query.or(`title_ar.ilike.%${searchQuery}%,title_en.ilike.%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-
-      setProjects((prev) => prev.filter((p) => p.id !== deleteId));
-      toast.success('Project deleted');
-      setDeleteId(null);
+      setProjects((data as Project[]) || []);
     } catch (error) {
-      console.error('Delete error:', error);
-      toast.error('Failed to delete project');
+      console.error('Error fetching projects:', error);
     } finally {
-      setIsDeleting(false);
+      setLoading(false);
     }
-  };
+  }, [supabase, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   // Toggle visibility
   const toggleVisibility = async (project: Project) => {
     try {
-      const { error } = await supabase
+      const { error } = await untypedSupabase
         .from('projects')
         .update({ is_visible: !project.is_visible })
         .eq('id', project.id);
 
       if (error) throw error;
 
-      setProjects((prev) =>
-        prev.map((p) =>
+      setProjects(prev =>
+        prev.map(p =>
           p.id === project.id ? { ...p, is_visible: !p.is_visible } : p
         )
       );
-      toast.success('Visibility updated');
     } catch (error) {
-      console.error('Update error:', error);
-      toast.error('Failed to update');
+      console.error('Error toggling visibility:', error);
     }
   };
 
   // Toggle featured
   const toggleFeatured = async (project: Project) => {
     try {
-      const { error } = await supabase
+      const { error } = await untypedSupabase
         .from('projects')
         .update({ is_featured: !project.is_featured })
         .eq('id', project.id);
 
       if (error) throw error;
 
-      setProjects((prev) =>
-        prev.map((p) =>
+      setProjects(prev =>
+        prev.map(p =>
           p.id === project.id ? { ...p, is_featured: !p.is_featured } : p
         )
       );
-      toast.success('Featured status updated');
     } catch (error) {
-      console.error('Update error:', error);
-      toast.error('Failed to update');
+      console.error('Error toggling featured:', error);
     }
   };
 
-  const columns: Column<Project>[] = [
-    {
-      key: 'title_en',
-      label: 'Project',
-      sortable: true,
-      render: (project) => (
-        <div className="flex items-center gap-3">
-          {project.thumbnail_url ? (
-            <img
-              src={project.thumbnail_url}
-              alt={project.title_en}
-              className="w-12 h-12 rounded-lg object-cover"
-            />
-          ) : (
-            <div className="w-12 h-12 rounded-lg bg-dark-700 flex items-center justify-center">
-              <FolderOpen className="h-5 w-5 text-dark-400" />
-            </div>
-          )}
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-white">{project.title_en}</span>
-              {project.is_featured && (
-                <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
-              )}
-              {project.is_private && (
-                <Lock className="h-4 w-4 text-dark-400" />
-              )}
-            </div>
-            <span className="text-sm text-dark-400">{project.slug}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      sortable: true,
-      render: (project) => {
-        const variants: Record<string, 'success' | 'warning' | 'secondary'> = {
-          published: 'success',
-          draft: 'warning',
-          archived: 'secondary',
-        };
-        return (
-          <Badge variant={variants[project.status]}>
-            {project.status}
-          </Badge>
-        );
-      },
-    },
-    {
-      key: 'is_visible',
-      label: 'Visible',
-      render: (project) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleVisibility(project);
-          }}
-          className="p-1 rounded hover:bg-dark-700 transition-colors"
-        >
-          {project.is_visible ? (
-            <Eye className="h-5 w-5 text-green-400" />
-          ) : (
-            <EyeOff className="h-5 w-5 text-dark-400" />
-          )}
-        </button>
-      ),
-    },
-    {
-      key: 'technologies',
-      label: 'Technologies',
-      render: (project) => {
-        const techs = (project.technologies as string[]) || [];
-        return (
-          <div className="flex flex-wrap gap-1">
-            {techs.slice(0, 3).map((tech) => (
-              <Badge key={tech} variant="secondary" size="sm">
-                {tech}
-              </Badge>
-            ))}
-            {techs.length > 3 && (
-              <Badge variant="secondary" size="sm">
-                +{techs.length - 3}
-              </Badge>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'display_order',
-      label: 'Order',
-      sortable: true,
-      width: '80px',
-      render: (project) => (
-        <span className="text-dark-400">{project.display_order}</span>
-      ),
-    },
-  ];
+  // Delete project
+  const deleteProject = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا المشروع؟')) return;
 
-  const actions: Action<Project>[] = [
-    {
-      label: 'Edit',
-      icon: <Edit className="h-4 w-4" />,
-      onClick: (project) => router.push(`/admin/projects/${project.id}`),
-    },
-    {
-      label: 'View on Site',
-      icon: <ExternalLink className="h-4 w-4" />,
-      onClick: (project) => window.open(`/en/projects/${project.slug}`, '_blank'),
-      show: (project) => project.status === 'published',
-    },
-    {
-      label: project => project.is_featured ? 'Remove Featured' : 'Make Featured',
-      icon: <Star className="h-4 w-4" />,
-      onClick: toggleFeatured,
-    },
-    {
-      label: 'Delete',
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: (project) => setDeleteId(project.id),
-      danger: true,
-    },
-  ];
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setProjects(prev => prev.filter(p => p.id !== id));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const styles = {
+      published: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+      archived: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+    };
+    const labels = {
+      published: 'منشور',
+      draft: 'مسودة',
+      archived: 'مؤرشف',
+    };
+    return (
+      <span className={`px-2 py-1 text-xs rounded-full ${styles[status as keyof typeof styles]}`}>
+        {labels[status as keyof typeof labels]}
+      </span>
+    );
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Projects</h1>
-          <p className="text-dark-400">
-            Manage your portfolio projects
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            المشاريع
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
+            إدارة مشاريعك ومعرض أعمالك
           </p>
         </div>
-        <Button
-          onClick={() => router.push('/admin/projects/new')}
-          leftIcon={<Plus className="h-4 w-4" />}
+        <Link
+          href="/admin/projects/new"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
         >
-          New Project
-        </Button>
+          <Plus className="w-5 h-5" />
+          مشروع جديد
+        </Link>
       </div>
 
-      {/* Table */}
-      <DataTable
-        data={projects}
-        columns={columns}
-        actions={actions}
-        keyField="id"
-        isLoading={isLoading}
-        searchable
-        searchPlaceholder="Search projects..."
-        emptyMessage="No projects yet"
-        emptyIcon={<FolderOpen className="h-12 w-12" />}
-      />
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="بحث في المشاريع..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pr-10 pl-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
 
-      {/* Delete Confirmation */}
-      <ConfirmModal
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        onConfirm={handleDelete}
-        title="Delete Project"
-        message="Are you sure you want to delete this project? This action cannot be undone."
-        confirmText="Delete"
-        variant="danger"
-        isLoading={isDeleting}
-      />
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-primary-500"
+        >
+          <option value="all">جميع الحالات</option>
+          <option value="published">منشور</option>
+          <option value="draft">مسودة</option>
+          <option value="archived">مؤرشف</option>
+        </select>
+
+        <button
+          onClick={fetchProjects}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* Projects Grid */}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            لا توجد مشاريع بعد
+          </p>
+          <Link
+            href="/admin/projects/new"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            <Plus className="w-5 h-5" />
+            إنشاء أول مشروع
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((project) => (
+            <div
+              key={project.id}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden group"
+            >
+              {/* Thumbnail */}
+              <div className="relative aspect-video bg-gray-100 dark:bg-gray-700">
+                {project.thumbnail_url ? (
+                  <Image
+                    src={project.thumbnail_url}
+                    alt={project.title_ar}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    لا توجد صورة
+                  </div>
+                )}
+
+                {/* Overlay Actions */}
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Link
+                    href={`/admin/projects/${project.id}`}
+                    className="p-2 bg-white rounded-full hover:bg-gray-100"
+                  >
+                    <Edit className="w-5 h-5 text-gray-700" />
+                  </Link>
+                  <button
+                    onClick={() => toggleVisibility(project)}
+                    className="p-2 bg-white rounded-full hover:bg-gray-100"
+                  >
+                    {project.is_visible ? (
+                      <EyeOff className="w-5 h-5 text-gray-700" />
+                    ) : (
+                      <Eye className="w-5 h-5 text-gray-700" />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => deleteProject(project.id)}
+                    className="p-2 bg-white rounded-full hover:bg-gray-100"
+                  >
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
+
+                {/* Badges */}
+                <div className="absolute top-2 right-2 flex gap-1">
+                  {project.is_featured && (
+                    <span className="p-1 bg-yellow-500 rounded-full">
+                      <Star className="w-4 h-4 text-white" />
+                    </span>
+                  )}
+                  {!project.is_visible && (
+                    <span className="p-1 bg-gray-500 rounded-full">
+                      <EyeOff className="w-4 h-4 text-white" />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    {project.title_ar}
+                  </h3>
+                  {getStatusBadge(project.status)}
+                </div>
+
+                <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">
+                  {project.description_ar}
+                </p>
+
+                {/* Technologies */}
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {(project.technologies as string[])?.slice(0, 3).map((tech, i) => (
+                    <span
+                      key={i}
+                      className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded"
+                    >
+                      {tech}
+                    </span>
+                  ))}
+                  {(project.technologies as string[])?.length > 3 && (
+                    <span className="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded">
+                      +{(project.technologies as string[]).length - 3}
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>
+                    {formatDistanceToNow(new Date(project.created_at), {
+                      addSuffix: true,
+                      locale: ar,
+                    })}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {project.project_url && (
+                      <a
+                        href={project.project_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary-600"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                    {project.github_url && (
+                      <a
+                        href={project.github_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary-600"
+                      >
+                        <Github className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
