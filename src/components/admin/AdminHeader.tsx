@@ -1,135 +1,241 @@
-// ============================================
-// Admin Header Component
-// ============================================
-
+// src/components/admin/AdminHeader.tsx
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 import {
-  Menu,
   Bell,
   Search,
   Moon,
   Sun,
-  ExternalLink,
-  Settings,
   LogOut,
+  Settings,
   User,
+  ChevronDown,
+  Menu,
+  X,
 } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
-import { useAuth } from '@/lib/hooks/useAuth';
-import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/Dropdown';
-import type { Admin } from '@/types/database';
+import { useTheme } from 'next-themes';
 
-interface AdminHeaderProps {
-  admin: Admin;
-  onMenuClick: () => void;
+interface Admin {
+  id: string;
+  email: string;
+  display_name?: string;
+  role: string;
 }
 
-export function AdminHeader({ admin, onMenuClick }: AdminHeaderProps) {
-  const { signOut } = useAuth();
-  const [isDark, setIsDark] = useState(true);
+interface AdminHeaderProps {
+  onMenuToggle?: () => void;
+  isSidebarOpen?: boolean;
+}
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
+export default function AdminHeader({ onMenuToggle, isSidebarOpen }: AdminHeaderProps) {
+  const [admin, setAdmin] = useState<Admin | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const supabase = createClient();
+
+  useEffect(() => {
+    const fetchAdmin = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: adminData } = await supabase
+          .from('admins')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (adminData) {
+          setAdmin({
+            id: adminData.id,
+            email: adminData.email,
+            display_name: adminData.display_name || adminData.email.split('@')[0],
+            role: adminData.role,
+          });
+        } else {
+          // Fallback if admin record doesn't exist
+          setAdmin({
+            id: user.id,
+            email: user.email || '',
+            display_name: user.email?.split('@')[0] || 'Admin',
+            role: 'admin',
+          });
+        }
+      }
+    };
+
+    const fetchUnreadMessages = async () => {
+      const { count } = await supabase
+        .from('contact_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'new');
+
+      setUnreadCount(count || 0);
+    };
+
+    fetchAdmin();
+    fetchUnreadMessages();
+  }, [supabase]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/admin/login');
+  };
+
+  const getDisplayName = () => {
+    if (!admin) return 'Admin';
+    return admin.display_name || admin.email.split('@')[0];
+  };
+
+  const getInitial = () => {
+    const name = getDisplayName();
+    return name.charAt(0).toUpperCase();
+  };
+
+  const getRoleLabel = () => {
+    if (!admin) return '';
+    const roles: Record<string, string> = {
+      owner: 'مالك',
+      super_admin: 'مدير عام',
+      admin: 'مدير',
+      editor: 'محرر',
+    };
+    return roles[admin.role] || admin.role;
   };
 
   return (
-    <header className="sticky top-0 z-40 h-16 bg-dark-900/80 backdrop-blur-lg border-b border-dark-700 flex items-center justify-between px-6">
-      {/* Left Side */}
+    <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 lg:px-6">
+      {/* Left side - Menu toggle & Search */}
       <div className="flex items-center gap-4">
-        {/* Mobile Menu Button */}
         <button
-          onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg hover:bg-dark-800 transition-colors"
+          onClick={onMenuToggle}
+          className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
         >
-          <Menu className="h-5 w-5" />
+          {isSidebarOpen ? (
+            <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          ) : (
+            <Menu className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          )}
         </button>
 
-        {/* Search */}
-        <div className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-dark-800 border border-dark-700 focus-within:border-primary-500 transition-colors">
-          <Search className="h-4 w-4 text-dark-400" />
+        <div className="hidden md:flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2 w-64">
+          <Search className="w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search..."
-            className="bg-transparent border-none outline-none text-sm text-white placeholder:text-dark-400 w-48 lg:w-64"
+            placeholder="بحث..."
+            className="bg-transparent border-none outline-none text-sm w-full text-gray-700 dark:text-gray-300 placeholder-gray-400"
           />
-          <kbd className="hidden lg:inline-flex items-center gap-1 px-2 py-0.5 text-xs text-dark-400 bg-dark-700 rounded">
-            ⌘K
-          </kbd>
         </div>
       </div>
 
-      {/* Right Side */}
+      {/* Right side - Actions */}
       <div className="flex items-center gap-2">
-        {/* View Site */}
-        <a
-          href="/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden sm:flex items-center gap-2 px-3 py-2 text-sm text-dark-300 hover:text-white rounded-lg hover:bg-dark-800 transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-          <span>View Site</span>
-        </a>
-
-        {/* Theme Toggle */}
+        {/* Theme toggle */}
         <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-dark-800 transition-colors"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
         >
-          {isDark ? (
-            <Moon className="h-5 w-5 text-dark-300" />
+          {theme === 'dark' ? (
+            <Sun className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           ) : (
-            <Sun className="h-5 w-5 text-amber-400" />
+            <Moon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
           )}
         </button>
 
         {/* Notifications */}
-        <button className="relative p-2 rounded-lg hover:bg-dark-800 transition-colors">
-          <Bell className="h-5 w-5 text-dark-300" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full" />
-        </button>
-
-        {/* User Menu */}
-        <Dropdown
-          trigger={
-            <button className="flex items-center gap-3 p-1.5 rounded-lg hover:bg-dark-800 transition-colors">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
-                <span className="text-white text-sm font-semibold">
-                  {admin.display_name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-white">
-                  {admin.display_name}
-                </p>
-                <p className="text-xs text-dark-400 capitalize">{admin.role}</p>
-              </div>
-            </button>
-          }
+        <Link
+          href="/admin/inbox"
+          className="relative p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
         >
-          <div className="px-4 py-3 border-b border-dark-700">
-            <p className="text-sm font-medium text-white">{admin.display_name}</p>
-            <p className="text-xs text-dark-400">{admin.email}</p>
-          </div>
-          <DropdownItem icon={<User className="h-4 w-4" />}>
-            Profile
-          </DropdownItem>
-          <DropdownItem icon={<Settings className="h-4 w-4" />}>
-            Settings
-          </DropdownItem>
-          <DropdownSeparator />
-          <DropdownItem
-            icon={<LogOut className="h-4 w-4" />}
-            danger
-            onClick={signOut}
+          <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
+
+        {/* User dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center gap-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
-            Sign Out
-          </DropdownItem>
-        </Dropdown>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+              <span className="text-white text-sm font-semibold">
+                {getInitial()}
+              </span>
+            </div>
+            <div className="hidden md:block text-right">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {getDisplayName()}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {getRoleLabel()}
+              </p>
+            </div>
+            <ChevronDown className="w-4 h-4 text-gray-400 hidden md:block" />
+          </button>
+
+          {/* Dropdown menu */}
+          {isDropdownOpen && (
+            <div className="absolute left-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-2 z-50">
+              <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {getDisplayName()}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {admin?.email}
+                </p>
+              </div>
+
+              <div className="py-1">
+                <Link
+                  href="/admin/settings"
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <User className="w-4 h-4" />
+                  الملف الشخصي
+                </Link>
+                <Link
+                  href="/admin/settings"
+                  className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <Settings className="w-4 h-4" />
+                  الإعدادات
+                </Link>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 py-1">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <LogOut className="w-4 h-4" />
+                  تسجيل الخروج
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
