@@ -4,7 +4,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/Badge';
 import { DataTable, Column, Action } from '@/components/admin/DataTable';
 import { ConfirmModal } from '@/components/ui/Modal';
 import { formatShortDate } from '@/lib/utils/formatDate';
-import type { BlogPost, BlogPostUpdate } from '@/types/database';
+import type { BlogPost } from '@/types/database';
 
 export default function BlogPage() {
   const router = useRouter();
@@ -56,7 +56,8 @@ export default function BlogPage() {
     };
 
     fetchPosts();
-  }, [supabase, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Delete post
   const handleDelete = async () => {
@@ -83,22 +84,21 @@ export default function BlogPage() {
   };
 
   // Toggle visibility
-  const toggleVisibility = async (post: BlogPost) => {
+  const toggleVisibility = useCallback(async (post: BlogPost) => {
     try {
-      const updateData: BlogPostUpdate = { 
-        is_visible: !post.is_visible 
-      };
+      const newValue = !post.is_visible;
       
       const { error } = await supabase
         .from('blog_posts')
-        .update(updateData)
-        .eq('id', post.id);
+        .update({ is_visible: newValue })
+        .eq('id', post.id)
+        .select();
 
       if (error) throw error;
 
       setPosts((prev) =>
         prev.map((p) =>
-          p.id === post.id ? { ...p, is_visible: !p.is_visible } : p
+          p.id === post.id ? { ...p, is_visible: newValue } : p
         )
       );
       toast.success('Visibility updated');
@@ -106,25 +106,24 @@ export default function BlogPage() {
       console.error('Update error:', error);
       toast.error('Failed to update');
     }
-  };
+  }, [supabase, toast]);
 
   // Toggle featured
-  const toggleFeatured = async (post: BlogPost) => {
+  const toggleFeatured = useCallback(async (post: BlogPost) => {
     try {
-      const updateData: BlogPostUpdate = { 
-        is_featured: !post.is_featured 
-      };
+      const newValue = !post.is_featured;
       
       const { error } = await supabase
         .from('blog_posts')
-        .update(updateData)
-        .eq('id', post.id);
+        .update({ is_featured: newValue })
+        .eq('id', post.id)
+        .select();
 
       if (error) throw error;
 
       setPosts((prev) =>
         prev.map((p) =>
-          p.id === post.id ? { ...p, is_featured: !p.is_featured } : p
+          p.id === post.id ? { ...p, is_featured: newValue } : p
         )
       );
       toast.success('Featured status updated');
@@ -132,7 +131,7 @@ export default function BlogPage() {
       console.error('Update error:', error);
       toast.error('Failed to update');
     }
-  };
+  }, [supabase, toast]);
 
   const columns: Column<BlogPost>[] = [
     {
