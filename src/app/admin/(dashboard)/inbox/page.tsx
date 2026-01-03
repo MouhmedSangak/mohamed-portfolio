@@ -40,12 +40,11 @@ export default function InboxPage() {
   const [statusFilter, setStatusFilter] = useState<MessageStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  const supabase = createClient();
-
   // Fetch messages
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
+      const supabase = createClient();
       let query = supabase
         .from('contact_messages')
         .select('*')
@@ -68,23 +67,24 @@ export default function InboxPage() {
     } finally {
       setLoading(false);
     }
-  }, [supabase, statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery]);
 
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
 
-  // Update message status - Fixed with type assertion
+  // Update message status - Using raw client
   const updateMessageStatus = async (id: string, newStatus: MessageStatus) => {
     try {
-      const updates = {
-        status: newStatus,
-        ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {}),
-      };
-
-      const { error } = await supabase
+      const supabase = createClient();
+      
+      // Use raw query to bypass TypeScript strict checking
+      const { error } = await (supabase as any)
         .from('contact_messages')
-        .update(updates as any)
+        .update({ 
+          status: newStatus,
+          ...(newStatus === 'replied' ? { replied_at: new Date().toISOString() } : {})
+        })
         .eq('id', id);
 
       if (error) throw error;
@@ -111,6 +111,7 @@ export default function InboxPage() {
     if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
 
     try {
+      const supabase = createClient();
       const { error } = await supabase
         .from('contact_messages')
         .delete()
