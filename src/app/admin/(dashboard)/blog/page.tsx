@@ -88,11 +88,11 @@ export default function BlogPage() {
     try {
       const newValue = !post.is_visible;
       
-      const { error } = await supabase
-        .from('blog_posts')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase
+        .from('blog_posts') as any)
         .update({ is_visible: newValue })
-        .eq('id', post.id)
-        .select();
+        .eq('id', post.id);
 
       if (error) throw error;
 
@@ -113,11 +113,11 @@ export default function BlogPage() {
     try {
       const newValue = !post.is_featured;
       
-      const { error } = await supabase
-        .from('blog_posts')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase
+        .from('blog_posts') as any)
         .update({ is_featured: newValue })
-        .eq('id', post.id)
-        .select();
+        .eq('id', post.id);
 
       if (error) throw error;
 
